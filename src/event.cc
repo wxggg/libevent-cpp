@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <iostream>
 #include <iomanip>
+#include <iterator>
 
 namespace eve
 {
@@ -28,17 +29,17 @@ event::event(event_base *base, int fd, short events,
 
 void event::set(event_base *base, int fd, short events, void (*callback)(int, short, void *))
 {
-	std::cout << __func__ <<" base="<<std::hex<<base<< std::endl;
+	std::cout << __func__ << " base=" << std::hex << base << std::endl;
 	if (base)
 	{
 		this->ev_base = base;
 	}
-	
+
 	if (!this->ev_base)
 	{
 		std::cout << "err ev_base not set yet\n";
 	}
-	
+
 	this->ev_callback = callback;
 	this->ev_fd = fd;
 	this->ev_events = events;
@@ -54,7 +55,6 @@ void event::set_base(event_base *base)
 	std::cout << __func__ << std::endl;
 	this->ev_base = base;
 }
-
 
 /** class event_base ** 
  * 	to manage event queues **/
@@ -105,7 +105,7 @@ int event_base::loop(int flags)
 	int i = 0;
 	while (!done && i++ < 5)
 	{
-		std::cout<<"i="<<i<<std::endl;
+		std::cout << "i=" << i << std::endl;
 		/* Terminate the loop if we have been asked to */
 		if (this->event_gotterm)
 		{
@@ -145,6 +145,7 @@ int event_base::loop(int flags)
 		if (this->event_count_active)
 		{
 			event_process_active();
+			std::cout << "---- event process active finished -----\n";
 			if (!this->event_count_active && (flags & EVLOOP_ONCE))
 				done = 1;
 		}
@@ -163,7 +164,7 @@ int event_base::loop(int flags)
 
 int event_base::add_event(event *ev, struct timeval *tv)
 {
-	std::cout << __func__ <<" ev->fd="<<ev->ev_fd<< std::endl;
+	std::cout << __func__ << " ev->fd=" << ev->ev_fd << std::endl;
 	assert(!(ev->ev_flags & ~EVLIST_ALL));
 
 	if (tv != NULL)
@@ -228,7 +229,7 @@ int event_base::del_event(event *ev)
 	return 0;
 }
 
-void event_base::event_active(event *ev, int res, short ncalls)
+void event_base::activate(event *ev, int res, short ncalls)
 {
 	std::cout << __func__ << std::endl;
 	/* We get different kinds of events, add them together */
@@ -237,16 +238,19 @@ void event_base::event_active(event *ev, int res, short ncalls)
 		ev->ev_res |= res;
 		return;
 	}
-
+	
+	ev->ev_flags |= EVLIST_ACTIVE;
 	ev->ev_res = res;
 	ev->ev_ncalls = ncalls;
 	// pncalls ??
-	event_queue_insert(ev, EVLIST_ACTIVE);
+
+	this->event_count_active++;
+	this->activequeues[ev->ev_pri].push_back(ev);
 }
 
 void event_base::event_queue_remove(event *ev, int queue)
 {
-	std::cout << __func__ << " queue=0x"<<std::hex<<queue<<std::endl;
+	std::cout << __func__ << " queue=0x" << std::hex << queue << std::endl;
 	if (!(ev->ev_flags & queue))
 	{
 		std::cerr << __func__ << " " << ev->ev_fd << " not on queue " << queue << std::endl;
@@ -265,16 +269,13 @@ void event_base::event_queue_remove(event *ev, int queue)
 
 	switch (queue)
 	{
-	case EVLIST_ACTIVE:
-		if (docount)
-			this->event_count_active--;
-		this->activequeues[ev->ev_pri].remove(ev);
-		break;
 	case EVLIST_SIGNAL:
+		this->signalqueue.remove(ev);
 		break;
 	case EVLIST_TIMEOUT:
 		break;
 	case EVLIST_INSERTED:
+		this->eventqueue.remove(ev);
 		break;
 	default:
 		break;
@@ -283,7 +284,7 @@ void event_base::event_queue_remove(event *ev, int queue)
 
 void event_base::event_queue_insert(event *ev, int queue)
 {
-	std::cout << __func__ << " queue=0x"<<std::hex<<queue<<std::endl;
+	std::cout << __func__ << " queue=0x" << std::hex << queue << std::endl;
 	if (ev->ev_flags & queue)
 	{
 		/* Double insertion is possible for active events */
@@ -302,13 +303,6 @@ void event_base::event_queue_insert(event *ev, int queue)
 	ev->ev_flags |= queue;
 	switch (queue)
 	{
-	case EVLIST_ACTIVE:
-		if (docount)
-		{
-			this->event_count_active++;
-			this->activequeues[ev->ev_pri].push_back(ev);
-		}
-		break;
 	case EVLIST_SIGNAL:
 		this->signalqueue.push_back(ev);
 		break;
@@ -327,34 +321,33 @@ void event_base::event_process_active()
 {
 	std::cout << __func__ << std::endl;
 
-	if (!this->event_count_active)
+	if (!this->event_count_active || this->activequeues.empty())
 		return;
 
-	std::list<event *> *pactiveq;
+	std::list<event *> &activeq = this->activequeues[0];
 	for (auto &item : this->activequeues)
 	{
-		if (item.size() > 0)
+		if (!item.empty())
 		{
-			pactiveq = &item;
+			activeq = item;
 			break;
 		}
 	}
 
-	short ncalls;
-	for (auto &ev : *pactiveq)
+	event *ev;
+	std::list<event *>::iterator i = activeq.begin();
+	while (i != activeq.end())
 	{
-		event_queue_remove(ev, EVLIST_ACTIVE);
-
-		/* Allows deletes to work */
-		ncalls = ev->ev_ncalls;
-		ev->ev_pncalls = &ncalls;
-		while (ncalls)
-		{
-			ncalls--;
-			ev->ev_ncalls = ncalls;
+		ev = *i;
+		while(ev->ev_ncalls) {
+			ev->ev_ncalls--;
 			(*ev->ev_callback)((int)ev->ev_fd, ev->ev_res, ev);
 		}
+		this->event_count--;
+		this->event_count_active--;
+		i = activeq.erase(i);
 	}
+
 }
 
 } // namespace eve

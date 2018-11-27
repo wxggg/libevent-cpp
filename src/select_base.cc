@@ -57,7 +57,7 @@ int select_base::dispatch(struct timeval *tv)
 
     if (res == -1)
     {
-        std::cout<<"select res=-1\n";
+        std::cout << "select res=-1\n";
         if (errno != EINTR)
         {
             std::cout << "select error errno=" << errno << std::endl;
@@ -68,7 +68,7 @@ int select_base::dispatch(struct timeval *tv)
     }
     else if (evsignal::caught)
     {
-        std::cout<<"evsignal caught=1"<<std::endl;
+        std::cout << "evsignal caught=1" << std::endl;
         evsig->process();
     }
 
@@ -90,13 +90,13 @@ int select_base::dispatch(struct timeval *tv)
         {
             if (!(r_ev->ev_events & EV_PERSIST))
                 this->del(r_ev);
-            this->event_active(r_ev, res & r_ev->ev_events, 1);
+            this->activate(r_ev, res & r_ev->ev_events, 1);
         }
         if (w_ev && w_ev != r_ev && (res & w_ev->ev_events))
         {
             if (!(w_ev->ev_events & EV_PERSIST))
                 this->del(w_ev);
-            this->event_active(w_ev, res & w_ev->ev_events, 1);
+            this->activate(w_ev, res & w_ev->ev_events, 1);
         }
     }
 
@@ -114,9 +114,6 @@ int select_base::resize(int fdsz)
     event_readset_out.resize(fdsz);
     event_writeset_in.resize(fdsz);
     event_writeset_out.resize(fdsz);
-
-    event_r_by_fd.resize(fdsz);
-    event_w_by_fd.resize(fdsz);
 
     this->event_fdsz = fdsz;
 

@@ -1,5 +1,6 @@
 #include "event.hh"
 #include <vector>
+#include <map>
 #include <sys/select.h>
 #include <signal.h>
 
@@ -17,8 +18,9 @@ class select_base: public event_base
         std::vector<fd_set> event_writeset_in;
         std::vector<fd_set> event_writeset_out;
 
-        std::vector<event *> event_r_by_fd;
-        std::vector<event *> event_w_by_fd;
+
+        std::map<int, event *> event_r_by_fd;
+        std::map<int, event *> event_w_by_fd;
 
     public:
         select_base();

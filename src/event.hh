@@ -44,7 +44,8 @@ class event
 	int ev_res; /* result passed to event callback */
 
 	/** EVLIST_TIMEOUT EVLIST_INSERTED EVLIST_SIGNAL EVLIST_ACTIVE
-	 * EVLIST_INTERNAL EVLIST_INIT EVLIST_ALL */
+	 * EVLIST_INTERNAL EVLIST_INIT EVLIST_ALL 
+	 * EVLIST_INSERTED=READ/WRITE */
 	int ev_flags;
 
 	struct timeval ev_timeout;
@@ -72,7 +73,8 @@ class event_base
 	int event_count_active; /* counts of active events */
 	int event_gotterm;		/* Set to terminate loop */
 
-	std::vector<std::list<event *>> activequeues;
+	
+	std::vector<std::list<event *>> activequeues; 
 
 	struct timeval event_tv;
 
@@ -94,7 +96,8 @@ class event_base
 
 	int add_event(event *ev, struct timeval *tv);
 	int del_event(event *ev);
-	void event_active(event *ev, int res, short ncalls);
+	
+	void activate(event *ev, int res, short ncalls);
 
 	void event_queue_remove(event *ev, int queue);
 	void event_queue_insert(event *ev, int queue);

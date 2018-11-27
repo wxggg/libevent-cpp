@@ -14,7 +14,6 @@ int evsignal::ev_signal_pair[2];
 int evsignal::needrecalc = 0;
 int evsignal::ev_signal_added = 0;
 
-
 evsignal::evsignal(event_base *base)
 {
 	std::cout << __func__ << std::endl;
@@ -55,7 +54,7 @@ int evsignal::del(event *ev)
 	std::cout << __func__ << std::endl;
 	sigdelset(&this->evsigmask, ev->ev_fd);
 	this->needrecalc = 1;
-
+	std::cout << "cut1" << std::endl;
 	return sigaction(ev->ev_fd, (struct sigaction *)SIG_DFL, NULL);
 }
 
@@ -110,7 +109,7 @@ void evsignal::process()
 		{
 			if (!(ev->ev_events & EV_PERSIST))
 				this->ev_base->del_event(ev);
-			this->ev_base->event_active(ev, EV_SIGNAL, ncalls);
+			this->ev_base->activate(ev, EV_SIGNAL, ncalls);
 		}
 	}
 
@@ -124,7 +123,7 @@ void evsignal::callback(int fd, short what, void *arg)
 {
 	std::cout << __func__ << std::endl;
 	static char signals[100];
-	event *ev = (event*)arg;
+	event *ev = (event *)arg;
 	int n = read(fd, signals, sizeof(signals));
 	if (n == -1)
 	{
