@@ -1,0 +1,34 @@
+#include <iostream>
+#include <event.hh>
+#include <select_base.hh>
+#include <signal.h>
+
+#include <signal_event.hh>
+
+using namespace std;
+using namespace eve;
+
+int called = 0;
+
+void signal_cb(short event, void *arg)
+{
+    cout<<"signal call back \n";
+    eve::event *ev = (eve::event*) arg;
+    ev->del();
+}
+
+int main(int argc, char const *argv[])
+{
+    eve::select_base base;
+    base.priority_init(1); // allocate a single active queue
+
+    eve::signal_event ev_sig_int(&base);
+    ev_sig_int.set_callback(&signal_cb);
+    ev_sig_int.set_sig(SIGINT);
+
+    ev_sig_int.add();
+
+    base.loop(0);
+
+    return 0;
+}

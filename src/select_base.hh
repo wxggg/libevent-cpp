@@ -1,4 +1,5 @@
-#include "event.hh"
+#include "event_base.hh"
+
 #include <vector>
 #include <map>
 #include <sys/select.h>
@@ -6,34 +7,38 @@
 
 namespace eve
 {
-    
-class select_base: public event_base
+
+class rw_event;
+class select_base : public event_base
 {
-    private:
-    	int event_fds;		/* Highest fd in fd set */
-    	int event_fdsz;
-        
-        std::vector<fd_set> event_readset_in;
-        std::vector<fd_set> event_readset_out;
-        std::vector<fd_set> event_writeset_in;
-        std::vector<fd_set> event_writeset_out;
+  private:
+    int event_fds = 0; /* Highest fd in fd set */
+    int event_fdsz = 0;
 
+    fd_set *event_readset_in = nullptr;
+    fd_set *event_writeset_in = nullptr;
 
-        std::map<int, event *> event_r_by_fd;
-        std::map<int, event *> event_w_by_fd;
+    fd_set *event_readset_out = nullptr;
+    fd_set *event_writeset_out = nullptr;
 
-    public:
-        select_base();
-        ~select_base();
+    std::map<int, rw_event *> event_r_by_fd;
+    std::map<int, rw_event *> event_w_by_fd;
 
-        int add(event *ev);
-        int del(event *ev);
-        int recalc(int max);
-        int dispatch(struct timeval *tv);
-    private:
-        int resize(int fdsz);
-        void init();
-        int add();
+  public:
+    select_base();
+    ~select_base();
+
+    int add(rw_event *ev);
+    int del(rw_event *ev);
+    int recalc(int max);
+    int dispatch(struct timeval *tv);
+
+  private:
+    int resize(int fdsz);
+    void init();
+    int add();
+
+    void check_fdset();
 };
 
-} // eve
+} // namespace eve
