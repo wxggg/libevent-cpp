@@ -11,7 +11,6 @@ time_event::time_event(event_base *base)
     : event(base)
 {
     std::cout << __func__ << std::endl;
-    this->_events = EV_TIMEOUT;
     timerclear(&_timeout);
 }
 

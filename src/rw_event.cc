@@ -9,19 +9,18 @@ rw_event::rw_event(event_base *base)
     : event(base)
 {
     std::cout << __func__ << std::endl;
-    this->_events = 0;
 }
 
 void rw_event::add()
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
-    this->_base->eventqueue.push_back(this);
+    this->_base->add(this);
 }
 
 void rw_event::del()
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
-    this->_base->eventqueue.remove(this);
+    this->_base->del(this);
 }
 
 } // namespace eve

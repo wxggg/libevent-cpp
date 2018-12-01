@@ -20,11 +20,10 @@ event::event(event_base *base)
 	this->_pri = _base->activequeues.size() / 2;
 }
 
-void event::activate(int res, short ncalls)
+void event::activate(short ncalls)
 {
     std::cout << __func__ << std::endl;
 
-	_res = res;
 	_ncalls = ncalls;
 	this->_base->activequeues[_pri].push_back(this);
 }

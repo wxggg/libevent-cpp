@@ -5,7 +5,7 @@
 using namespace std;
 using namespace eve;
 
-void timeout_cb(short event, void *arg)
+void timeout_cb(void *arg)
 {
 	time_event *timeout = (time_event *)arg;
 	int newtime = time(NULL);

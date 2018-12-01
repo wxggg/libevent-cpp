@@ -92,7 +92,7 @@ int event_base::loop(int flags)
 		}
 
 		/* If we have no events, we just exit */
-		if (signalqueue.empty() && timeevset.empty() && !hasactive)
+		if (signalqueue.empty() && timeevset.empty() && !count_rw_events() && !hasactive)
 		{
 			std::cout << "have no events, just exit\n";
 			return 1;
@@ -101,26 +101,29 @@ int event_base::loop(int flags)
 		int res;
 		struct timeval now, off;
 		gettimeofday(&now, NULL);
-		if (timeevset.empty()) {
+		if (timeevset.empty())
+		{
 			/* no timeout event */
 			res = this->dispatch(NULL);
 		}
-		else {
+		else
+		{
 			time_event *timeev = *timeevset.begin();
 			/** judge if all timeout > now, if not then 
 			 *  means have some active timeout event need to be 
 			 *  processed, so do not dispatch, because dispatch 
 			 *  will wait until the next timeout appear */
-			if (timercmp(&(timeev->_timeout), &now, >)) {
+			if (timercmp(&(timeev->_timeout), &now, >))
+			{
 				timersub(&(timeev->_timeout), &now, &off);
 				/* attach timeout is off */
 				res = this->dispatch(&off);
 			}
 		}
 
-		
-		if (res == -1) {
-			std::cout<<"dispatch exit res="<<res<<std::endl;
+		if (res == -1)
+		{
+			std::cout << "dispatch exit res=" << res << std::endl;
 			return -1;
 		}
 
@@ -151,7 +154,7 @@ void event_base::timeout_process()
 		if (timercmp(&ev->_timeout, &now, >))
 			break;
 		i = timeevset.erase(i);
-		ev->activate(EV_TIMEOUT, 1);
+		ev->activate(1);
 	}
 }
 
@@ -180,7 +183,7 @@ void event_base::event_process_active()
 			while (ev->_ncalls)
 			{
 				ev->_ncalls--;
-				(*ev->_callback)(ev->_res, ev);
+				(*ev->_callback)(ev);
 			}
 			i = activeq.erase(i);
 		}
@@ -200,9 +203,9 @@ void event_base::evsignal_process()
 		ncalls = evsigcaught[sigev->_sig];
 		if (ncalls)
 		{
-			if (!(sigev->_events & EV_PERSIST))
+			if (!(sigev->is_persistent()))
 				i = signalqueue.erase(i);
-			sigev->activate(EV_SIGNAL, ncalls);
+			sigev->activate(ncalls);
 		}
 		i++;
 	}
@@ -217,11 +220,9 @@ int event_base::evsignal_recalc()
 	if (signalqueue.empty() && !needrecalc)
 		return 0;
 	needrecalc = 0;
-	std::cout<<"cut1"<<std::endl;
 	if (sigprocmask(SIG_BLOCK, &evsigmask, NULL) == -1)
 		return -1;
 
-	std::cout<<"cut2"<<std::endl;
 	struct sigaction sa;
 	/* Reinstall our signal handler. */
 	memset(&sa, 0, sizeof(sa));
@@ -231,7 +232,7 @@ int event_base::evsignal_recalc()
 
 	for (const auto &ev : signalqueue)
 	{
-		std::cout<<"_sig="<<ev->_sig<<std::endl;
+		std::cout << "_sig=" << ev->_sig << std::endl;
 		if (ev->_sig < 0 || ev->_sig >= NSIG)
 		{
 			std::cout << "error _sig not set\n";
@@ -252,7 +253,7 @@ int event_base::evsignal_deliver()
 	return sigprocmask(SIG_UNBLOCK, &evsigmask, NULL);
 }
 
-void event_base::readsig_cb(short what, void *arg)
+void event_base::readsig_cb(void *arg)
 {
 	std::cout << __func__ << std::endl;
 	static char signals[100];

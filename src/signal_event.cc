@@ -11,7 +11,6 @@ signal_event::signal_event(event_base *base)
     :event(base)
 {
     std::cout << __func__ << std::endl;
-    this->_events = EV_SIGNAL|EV_PERSIST;
 }
 
 void signal_event::add()

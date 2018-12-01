@@ -33,30 +33,32 @@ select_base::~select_base()
 
 void select_base::check_fdset()
 {
-    for (int i = 0; i <= event_fds; ++i)
-    {
-        if (FD_ISSET(i, event_readset_in))
-        {
-            assert(event_r_by_fd[i]);
-            assert(event_r_by_fd[i]->_events & EV_READ);
-            assert(event_r_by_fd[i]->_fd == i);
-        }
-        else
-        {
-            assert(!event_r_by_fd[i]);
-        }
+    std::cout << __func__ << std::endl;
+    bool iread = false, iwrite = false;
 
-        if (FD_ISSET(i, event_writeset_in))
+    for (auto kv : fd_map_rw)
+    {
+        std::cout<<"kv:"<<kv.first<<" "<<kv.second<<std::endl;
+        iread = false, iwrite = false;
+        if (FD_ISSET(kv.first, event_readset_in))
+            iread = true;
+        if (FD_ISSET(kv.first, event_writeset_in))
+            iwrite = true;
+
+        if (!iread && !iwrite)
         {
-            assert(event_w_by_fd[i]);
-            assert(event_w_by_fd[i]);
-            assert(event_w_by_fd[i]->_events & EV_WRITE);
-            assert(event_w_by_fd[i]->_fd == i);
+            assert(!kv.second);
+            continue;
         }
         else
         {
-            assert(!event_w_by_fd[i]);
+            assert(kv.second);
+            assert(kv.second->_fd == kv.first);
         }
+        if (iread)
+            assert(kv.second->is_readable());
+        if (iwrite)
+            assert(kv.second->is_writable());
     }
 }
 
@@ -70,6 +72,7 @@ int select_base::recalc(int max)
 int select_base::dispatch(struct timeval *tv)
 {
     std::cout << __PRETTY_FUNCTION__ << std::endl;
+    std::cout<<"event_fds="<<event_fds<<std::endl;
 
     check_fdset();
 
@@ -84,7 +87,7 @@ int select_base::dispatch(struct timeval *tv)
         return -1;
     }
 
-    int res = select(event_fds, event_readset_out, event_writeset_out, NULL, tv);
+    int res = select(event_fds + 1, event_readset_out, event_writeset_out, NULL, tv);
 
     check_fdset();
 
@@ -112,33 +115,34 @@ int select_base::dispatch(struct timeval *tv)
     }
 
     check_fdset();
-    for (int i = 0; i <= event_fds; ++i)
+    bool iread, iwrite;
+    rw_event *ev;
+
+    for (auto kv : fd_map_rw)
     {
-        rw_event *r_ev = nullptr, *w_ev = nullptr;
-        res = 0;
-        if (FD_ISSET(i, event_readset_out))
+        iread = iwrite = false;
+        if (FD_ISSET(kv.first, event_readset_out))
+            iread = true;
+        if (FD_ISSET(kv.first, event_writeset_out))
+            iwrite = true;
+
+        if ((iread || iwrite) && kv.second)
         {
-            r_ev = this->event_r_by_fd[i];
-            res |= EV_READ;
-        }
-        if (FD_ISSET(i, event_writeset_out))
-        {
-            w_ev = event_w_by_fd[i];
-            res |= EV_WRITE;
-        }
-        if (r_ev && (res & r_ev->_events))
-        {
-            if (!(r_ev->_events & EV_PERSIST))
-                this->del(r_ev);
-            r_ev->activate(res & r_ev->_events, 1);
-        }
-        if (w_ev && w_ev != r_ev && (res & w_ev->_events))
-        {
-            if (!(w_ev->_events & EV_PERSIST))
-                this->del(w_ev);
-            w_ev->activate(res & r_ev->_events, 1);
+            ev = kv.second;
+            if (iread && ev->is_readable())
+                ev->set_active_read();
+            if (iwrite && ev->is_writable())
+                ev->set_active_write();
+
+            if (ev->has_active_read() || ev->has_active_write())
+            {
+                if (!ev->is_persistent())
+                    ev->del();
+                ev->activate(1);
+            }
         }
     }
+
     check_fdset();
 
     return 0;
@@ -147,8 +151,6 @@ int select_base::dispatch(struct timeval *tv)
 int select_base::resize(int fdsz)
 {
     std::cout << __PRETTY_FUNCTION__ << std::endl;
-    int n_events = (fdsz / sizeof(fd_mask)) * NFDBITS;
-    int n_events_old = (this->event_fdsz / sizeof(fd_mask)) * NFDBITS;
 
     if (event_readset_in)
         check_fdset();
@@ -168,8 +170,6 @@ int select_base::resize(int fdsz)
 
     memset(event_readset_in + event_fdsz, 0, fdsz - event_fdsz);
     memset(event_writeset_in + event_fdsz, 0, fdsz - event_fdsz);
-    memset(event_readset_out + event_fdsz, 0, fdsz - event_fdsz);
-    memset(event_writeset_out + event_fdsz, 0, fdsz - event_fdsz);
 
     this->event_fdsz = fdsz;
 
@@ -193,27 +193,23 @@ int select_base::add(rw_event *ev)
 
         int needsize = ((ev->_fd + NFDBITS) / NFDBITS) * sizeof(fd_mask);
         while (fdsz < needsize)
-        {
             fdsz *= 2;
-        }
 
         if (fdsz != this->event_fdsz)
-        {
             this->resize(fdsz);
-        }
 
-        this->event_fdsz = ev->_fd;
+        this->event_fds = ev->_fd;
     }
 
-    if (ev->_events & EV_READ)
+    if (ev->is_readable())
     {
         FD_SET(ev->_fd, event_readset_in);
-        this->event_r_by_fd[ev->_fd] = ev;
+        this->fd_map_rw[ev->_fd] = ev;
     }
-    if (ev->_events & EV_WRITE)
+    if (ev->is_writable())
     {
         FD_SET(ev->_fd, event_writeset_in);
-        this->event_w_by_fd[ev->_fd] = ev;
+        this->fd_map_rw[ev->_fd] = ev;
     }
 
     return 0;
@@ -223,20 +219,21 @@ int select_base::del(rw_event *ev)
 {
     std::cout << __PRETTY_FUNCTION__ << std::endl;
     check_fdset();
-    if (ev->_events & EV_READ)
+    if (ev->is_readable())
     {
         FD_CLR(ev->_fd, event_readset_in);
-        this->event_r_by_fd[ev->_fd] = nullptr;
+        fd_map_rw.erase(ev->_fd);
     }
 
-    if (ev->_events & EV_WRITE)
+    if (ev->is_writable())
     {
         FD_CLR(ev->_fd, event_writeset_in);
-        this->event_w_by_fd[ev->_fd] = nullptr;
+        fd_map_rw.erase(ev->_fd);
     }
     check_fdset();
 
     return 0;
 }
+
 
 } // namespace eve
