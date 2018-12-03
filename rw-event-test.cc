@@ -1,6 +1,7 @@
 #include <rw_event.hh>
 #include <select_base.hh>
 #include <signal_event.hh>
+#include <poll_base.hh>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -38,7 +39,8 @@ void signal_int(void *arg)
 
 int main(int argc, char const *argv[])
 {
-    select_base base;
+    // select_base base;
+    poll_base base;
     base.priority_init(1);
 
     rw_event evfifo(&base);

@@ -1,9 +1,12 @@
+#pragma once
+
 #include <signal.h>
 #include <sys/time.h>
 
 #include <vector>
 #include <list>
 #include <set>
+#include <map>
 #include <iostream>
 
 namespace eve
@@ -31,7 +34,6 @@ class event_base
 	std::list<signal_event *> signalqueue;
 	std::set<time_event *, cmp_timeev> timeevset;
 
-	// evsignal *evsig;
 	sigset_t evsigmask;
 	rw_event *readsig;
 
@@ -40,6 +42,10 @@ class event_base
 	static int ev_signal_pair[2];
 	static int needrecalc;
 
+	std::map<int, rw_event *> fd_map_rw;
+	int _fds = 0; /* highest fd of added rw_event */
+	int _fdsz = 0;
+
   public:
 	event_base();
 	virtual ~event_base() { std::cout << __func__ << std::endl; }
@@ -47,7 +53,8 @@ class event_base
 	virtual int del(rw_event *) { return 0; }
 	virtual int recalc(int max) { return max; }
 	virtual int dispatch(struct timeval *) { return 0; }
-	virtual int count_rw_events() { return 0; }
+
+	int count_rw_events() { return fd_map_rw.size(); }
 
 	int priority_init(int npriorities);
 	int loop(int flags);
@@ -55,6 +62,7 @@ class event_base
 	void event_process_active();
 	void timeout_process();
 
+  protected:
 	void evsignal_process();
 	int evsignal_recalc();
 	int evsignal_deliver();

@@ -38,7 +38,7 @@ void select_base::check_fdset()
 
     for (auto kv : fd_map_rw)
     {
-        std::cout<<"kv:"<<kv.first<<" "<<kv.second<<std::endl;
+        std::cout << "kv:" << kv.first << " " << kv.second << std::endl;
         iread = false, iwrite = false;
         if (FD_ISSET(kv.first, event_readset_in))
             iread = true;
@@ -72,12 +72,11 @@ int select_base::recalc(int max)
 int select_base::dispatch(struct timeval *tv)
 {
     std::cout << __PRETTY_FUNCTION__ << std::endl;
-    std::cout<<"event_fds="<<event_fds<<std::endl;
 
     check_fdset();
 
-    memcpy(event_readset_out, event_readset_in, event_fdsz);
-    memcpy(event_writeset_out, event_writeset_in, event_fdsz);
+    memcpy(event_readset_out, event_readset_in, _fdsz);
+    memcpy(event_writeset_out, event_writeset_in, _fdsz);
 
     check_fdset();
 
@@ -87,7 +86,7 @@ int select_base::dispatch(struct timeval *tv)
         return -1;
     }
 
-    int res = select(event_fds + 1, event_readset_out, event_writeset_out, NULL, tv);
+    int res = select(_fds + 1, event_readset_out, event_writeset_out, NULL, tv);
 
     check_fdset();
 
@@ -168,10 +167,10 @@ int select_base::resize(int fdsz)
     newset = (fd_set *)realloc(event_writeset_out, fdsz);
     event_writeset_out = newset;
 
-    memset(event_readset_in + event_fdsz, 0, fdsz - event_fdsz);
-    memset(event_writeset_in + event_fdsz, 0, fdsz - event_fdsz);
+    memset(event_readset_in + _fdsz, 0, fdsz - _fdsz);
+    memset(event_writeset_in + _fdsz, 0, fdsz - _fdsz);
 
-    this->event_fdsz = fdsz;
+    this->_fdsz = fdsz;
 
     check_fdset();
 
@@ -185,9 +184,11 @@ int select_base::add(rw_event *ev)
      * Keep track of the highest fd, so that we can calculate the size
      * of the fd_sets for select(2)
      */
-    if (this->event_fds < ev->_fd)
+    if (this->_fds < ev->_fd)
+        this->_fds = ev->_fd;
+    if (this->_fdsz - 1 < ev->_fd)
     {
-        int fdsz = this->event_fdsz;
+        int fdsz = this->_fdsz;
         if (fdsz < sizeof(fd_mask))
             fdsz = sizeof(fd_mask);
 
@@ -195,13 +196,11 @@ int select_base::add(rw_event *ev)
         while (fdsz < needsize)
             fdsz *= 2;
 
-        if (fdsz != this->event_fdsz)
+        if (fdsz != this->_fdsz)
             this->resize(fdsz);
-
-        this->event_fds = ev->_fd;
     }
 
-    if (ev->is_readable())
+   if (ev->is_readable())
     {
         FD_SET(ev->_fd, event_readset_in);
         this->fd_map_rw[ev->_fd] = ev;
@@ -234,6 +233,5 @@ int select_base::del(rw_event *ev)
 
     return 0;
 }
-
 
 } // namespace eve
