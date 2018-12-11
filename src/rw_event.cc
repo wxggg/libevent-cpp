@@ -14,13 +14,13 @@ rw_event::rw_event(event_base *base)
 void rw_event::add()
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
-    this->_base->add(this);
+    this->base->add(this);
 }
 
 void rw_event::del()
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
-    this->_base->del(this);
+    this->base->del(this);
 }
 
 } // namespace eve

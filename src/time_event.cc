@@ -28,7 +28,7 @@ void time_event::set_timer(int nsec)
 void time_event::add()
 {
     std::cout << __PRETTY_FUNCTION__ << std::endl;
-    this->_base->timeevset.insert(this);
+    this->base->timeevset.insert(this);
 }
 
 void time_event::del()

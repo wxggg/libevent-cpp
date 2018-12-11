@@ -40,12 +40,12 @@ class event_base
 ```c++
 int poll_base::add(rw_event *ev)
 {
-    fd_map_rw[ev->_fd] = ev;
+    fd_map_rw[ev->fd] = ev;
     struct pollfd *pfd = new struct pollfd;
-    pfd->fd = ev->_fd;
+    pfd->fd = ev->fd;
     pfd->events = 0;
     pfd->revents = 0;
-    fd_map_poll[ev->_fd] = pfd;
+    fd_map_poll[ev->fd] = pfd;
     if (ev->is_readable())
         pfd->events |= POLLIN;
     if (ev->is_writable())
@@ -54,9 +54,9 @@ int poll_base::add(rw_event *ev)
 }
 int poll_base::del(rw_event *ev)
 {
-    delete fd_map_poll[ev->_fd];
-    fd_map_poll.erase(ev->_fd);
-    fd_map_rw.erase(ev->_fd);
+    delete fd_map_poll[ev->fd];
+    fd_map_poll.erase(ev->fd);
+    fd_map_rw.erase(ev->fd);
     return 0;
 }
 ```
@@ -272,6 +272,107 @@ out:
 }
 ```
 
+## 基于poll操作的针对文件资源的进程睡眠及唤醒操作
+前面提到无论是select机制还是poll机制在系统调用之后，内核之中都是通过轮询文件描述符集合的方式来判断该文件是否有读写。而最底层要执行的是文件的poll函数，最初的select机制采用的是select函数，后来都由poll函数替代。而poll函数会随着文件类型的不同在内核中文件poll的实现也是不同的，比如以pipe文件和fifo文件为例，二者在内核中属于不同类型的文件，有着不同类型的文件操作函数。那么poll机制是如何与Linux进程的睡眠和唤醒相结合的呢。
+
+### 以管道pipe为例的pipe_poll函数
+如下为内核中的fifo_poll函数实现，如果我们是使用mkfifo创建fifo文件的话，最终poll函数调用会调用如下函数，而其中最关键的就是这个`poll_wait`函数，其功能是将当前进程current加入到对应文件节点资源的等待列表`struct wait_queue`中去，这是一个与资源相关的等待队列，可以通过文件指针获取其首节点，而`poll_wait`将当前进程加入到等待队列之后，之后就可以通过该文件的各种操作来唤醒这个加入等待队列的进程，前面的`do_select`或`do_poll`循环跳出之后可以看到另一个函数`free_wait`，这是与`poll_wait`相对应的另一个用来将进程从等待队列中去除的操作。
+```c++
+static unsigned int pipe_poll(struct file * filp, poll_table * wait)
+{
+	unsigned int mask;
+	struct inode * inode = filp->f_inode;
+
+	poll_wait(&PIPE_WAIT(*inode), wait);
+	mask = POLLIN | POLLRDNORM;
+	if (PIPE_EMPTY(*inode))
+		mask = POLLOUT | POLLWRNORM;
+	if (!PIPE_WRITERS(*inode))
+		mask |= POLLHUP;
+	if (!PIPE_READERS(*inode))
+		mask |= POLLERR;
+	return mask;
+}
+
+void poll_wait(struct wait_queue ** wait_address, poll_table * p)
+{
+	struct poll_table_entry * entry;
+
+	if (!p || !wait_address)
+		return;
+	if (p->nr >= __MAX_POLL_TABLE_ENTRIES)
+		return;
+ 	entry = p->entry + p->nr;
+	entry->wait_address = wait_address;
+	entry->wait.task = current;
+	entry->wait.next = NULL;
+	add_wait_queue(wait_address,&entry->wait);
+	p->nr++;
+}
+```
+值得一提的是，`poll_wait`函数在几乎所有的文件操作函数`xxx_poll`中都会被调用，因为只有这样才会真正的将当前进程加入关联该文件的等待队列中。
+
+### 等待的进程如何唤醒
+前面提到在进程指针通过`poll_wait`被保存到等待队列中后，当前进程状态会被置于TASK_INTERRUPTIBLE的状态，也就是不接受调度，但是可以接收中断和唤醒。如果相关联的文件资源有其它的操作，如其它进程对pipe文件进行写入，那么等待队列中的所有的进程都会被唤醒。
+如下，在对fifo文件读或者写的时候有可能被睡眠，也有可能唤醒其它已经睡眠的进程，关键看读写的状态，如果读的时候发现管道是空的，那么就会将当前进程置于睡眠状态，如果成功从pipe缓冲pipebuf读取到了数据到用户缓存buf，之后就会唤醒因该管道文件而睡眠的等待队列上的进程，通过PIPE_WAIT(*inode)获取该队列，并通过wake_up_interruptible进行唤醒。同理写操作也会进行类似的睡眠及唤醒操作，写操作成功会唤醒因没有数据读如而睡眠的读进程。
+
+```c++
+static long pipe_read(struct inode * inode, struct file * filp,
+	char * buf, unsigned long count)
+{
+	...
+	if (filp->f_flags & O_NONBLOCK) {
+		...
+	} else while (PIPE_EMPTY(*inode) || PIPE_LOCK(*inode)) {
+		...
+		if (current->signal & ~current->blocked)
+			return -ERESTARTSYS;
+		interruptible_sleep_on(&PIPE_WAIT(*inode));
+	}
+	while (count>0 && (size = PIPE_SIZE(*inode))) {
+		// 从pipe缓冲pipebuf读取数据到用户程序缓存buf
+		copy_to_user(buf, pipebuf, chars );
+	}
+	PIPE_LOCK(*inode)--;
+	wake_up_interruptible(&PIPE_WAIT(*inode));
+	...
+	return 0;
+}
+	
+static long pipe_write(struct inode * inode, struct file * filp,
+	const char * buf, unsigned long count)
+{
+	...
+	if (!PIPE_READERS(*inode)) { /* no readers */
+		send_sig(SIGPIPE,current,0);
+		return -EPIPE;
+	}
+	...
+	while (count>0) {
+		while ((PIPE_FREE(*inode) < free) || PIPE_LOCK(*inode)) {
+			if (!PIPE_READERS(*inode)) { /* no readers */
+				send_sig(SIGPIPE,current,0);
+				return written? :-EPIPE;
+			}
+			if (current->signal & ~current->blocked)
+				return written? :-ERESTARTSYS;
+			if (filp->f_flags & O_NONBLOCK)
+				return written? :-EAGAIN;
+			interruptible_sleep_on(&PIPE_WAIT(*inode));
+		}
+		PIPE_LOCK(*inode)++;
+		while (count>0 && (free = PIPE_FREE(*inode))) {
+			// 从用户buf写入数据到pipebuf
+			copy_from_user(pipebuf, buf, chars );
+		}
+		PIPE_LOCK(*inode)--;
+		wake_up_interruptible(&PIPE_WAIT(*inode));
+	}
+	return written;
+}
+```
+
 ## 小结
 * 1. libevent-cpp 中对于poll的封装
 * 2. Linux内核poll及select代码分析基于linux-2.1.23版本
+* 3. Linux中与poll及文件读写有关的进程睡眠及唤醒机制

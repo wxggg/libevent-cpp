@@ -48,10 +48,10 @@ class event_base
 
   public:
 	event_base();
-	virtual ~event_base() { std::cout << __func__ << std::endl; }
+	virtual ~event_base(){};
 	virtual int add(rw_event *) { return 0; }
 	virtual int del(rw_event *) { return 0; }
-	virtual int recalc(int max) { return max; }
+	virtual int recalc(int max) { return 0; }
 	virtual int dispatch(struct timeval *) { return 0; }
 
 	int count_rw_events() { return fd_map_rw.size(); }

@@ -36,13 +36,13 @@ int select_base::add(rw_event *ev)
 
     if (ev->is_readable()) //事件可读
     {
-        FD_SET(ev->_fd, event_readset_in);
-        this->fd_map_rw[ev->_fd] = ev;
+        FD_SET(ev->fd, event_readset_in);
+        this->fd_map_rw[ev->fd] = ev;
     }
     if (ev->is_writable()) //事件可写
     {
-        FD_SET(ev->_fd, event_writeset_in);
-        this->fd_map_rw[ev->_fd] = ev;
+        FD_SET(ev->fd, event_writeset_in);
+        this->fd_map_rw[ev->fd] = ev;
     }
     return 0;
 }

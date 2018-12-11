@@ -7,18 +7,18 @@ class rw_event : public event
   private:
 	bool _read = false;
 	bool _write = false;
-	
+
 	bool _active_read = false;
 	bool _active_write = false;
 
   public:
-	int _fd = -1;
+	int fd = -1;
 
   public:
 	rw_event(event_base *base);
 	~rw_event() { std::cout << __func__ << std::endl; }
 
-	void set_fd(int fd) { _fd = fd; }
+	void set_fd(int fd) { this->fd = fd; }
 
 	void set_read() { _read = true; }
 	void set_write() { _write = true; }

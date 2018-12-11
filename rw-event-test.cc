@@ -2,6 +2,7 @@
 #include <select_base.hh>
 #include <signal_event.hh>
 #include <poll_base.hh>
+#include <epoll_base.hh>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -16,7 +17,7 @@ void fifo_read(void *arg)
 {
     rw_event *ev = (rw_event *)arg;
     char buf[255];
-    int len = read(ev->_fd, buf, sizeof(buf) - 1);
+    int len = read(ev->fd, buf, sizeof(buf) - 1);
     if (len == -1)
     {
         cerr << "read" << endl;
@@ -40,7 +41,8 @@ void signal_int(void *arg)
 int main(int argc, char const *argv[])
 {
     // select_base base;
-    poll_base base;
+    // poll_base base;
+    epoll_base base;
     base.priority_init(1);
 
     rw_event evfifo(&base);

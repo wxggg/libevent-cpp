@@ -52,15 +52,15 @@ class signal_event : public event
 void signal_event::add()
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
-    this->_base->signalqueue.push_back(this);
-    sigaddset(&this->_base->evsigmask, _sig);
+    this->base->signalqueue.push_back(this);
+    sigaddset(&this->base->evsigmask, _sig);
 }
 
 void signal_event::del()
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
-    this->_base->signalqueue.remove(this);
-    sigdelset(&this->_base->evsigmask, _sig);
+    this->base->signalqueue.remove(this);
+    sigdelset(&this->base->evsigmask, _sig);
     sigaction(_sig, (struct sigaction*)SIG_DFL, NULL);
 }
 ```
@@ -222,10 +222,10 @@ void event_base::event_process_active()
 		while (i != activeq.end())
 		{
 			ev = *i;
-			while (ev->_ncalls)
+			while (ev->ncalls)
 			{
-				ev->_ncalls--;
-				(*ev->_callback)(ev->_res, ev);
+				ev->ncalls--;
+				(*ev->callback)(ev->_res, ev);
 			}
 			i = activeq.erase(i);
 		}

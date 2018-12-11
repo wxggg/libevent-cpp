@@ -127,7 +127,8 @@ int event_base::loop(int flags)
 			return -1;
 		}
 
-		timeout_process();
+		if (!timeevset.empty())
+			timeout_process();
 		event_process_active();
 
 		if (this->recalc(0) == -1)
@@ -180,10 +181,11 @@ void event_base::event_process_active()
 		while (i != activeq.end())
 		{
 			ev = *i;
-			while (ev->_ncalls)
+			std::cout<<"ev->fd="<<ev->ncalls<<std::endl;
+			while (ev->ncalls)
 			{
-				ev->_ncalls--;
-				(*ev->_callback)(ev);
+				ev->ncalls--;
+				(*ev->callback)(ev);
 			}
 			i = activeq.erase(i);
 		}
@@ -232,13 +234,11 @@ int event_base::evsignal_recalc()
 
 	for (const auto &ev : signalqueue)
 	{
-		std::cout << "_sig=" << ev->_sig << std::endl;
 		if (ev->_sig < 0 || ev->_sig >= NSIG)
 		{
 			std::cout << "error _sig not set\n";
 			exit(-1);
 		}
-		std::cout << "_sig=" << ev->_sig << std::endl;
 		if (sigaction(ev->_sig, &sa, NULL) == -1)
 			return -1;
 	}
@@ -258,7 +258,7 @@ void event_base::readsig_cb(void *arg)
 	std::cout << __func__ << std::endl;
 	static char signals[100];
 	rw_event *ev = (rw_event *)arg;
-	int n = read(ev->_fd, signals, sizeof(signals));
+	int n = read(ev->fd, signals, sizeof(signals));
 	if (n == -1)
 	{
 		std::cout << __func__ << " err \n";

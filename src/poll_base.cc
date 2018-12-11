@@ -37,7 +37,7 @@ void poll_base::poll_check()
         assert(fd == pfd->fd);
         ev = fd_map_rw[fd];
         assert(ev);
-        assert(fd == ev->_fd);
+        assert(fd == ev->fd);
         if (ev->is_readable())
             assert(pfd->events & POLLIN);
         if (ev->is_writable())
@@ -114,12 +114,12 @@ int poll_base::dispatch(struct timeval *tv)
 int poll_base::add(rw_event *ev)
 {
     std::cout << __PRETTY_FUNCTION__ << std::endl;
-    fd_map_rw[ev->_fd] = ev;
+    fd_map_rw[ev->fd] = ev;
     struct pollfd *pfd = new struct pollfd;
-    pfd->fd = ev->_fd;
+    pfd->fd = ev->fd;
     pfd->events = 0;
     pfd->revents = 0;
-    fd_map_poll[ev->_fd] = pfd;
+    fd_map_poll[ev->fd] = pfd;
 
     if (ev->is_readable())
         pfd->events |= POLLIN;
@@ -132,9 +132,9 @@ int poll_base::add(rw_event *ev)
 int poll_base::del(rw_event *ev)
 {
     std::cout << __PRETTY_FUNCTION__ << std::endl;
-    delete fd_map_poll[ev->_fd];
-    fd_map_poll.erase(ev->_fd);
-    fd_map_rw.erase(ev->_fd);
+    delete fd_map_poll[ev->fd];
+    fd_map_poll.erase(ev->fd);
+    fd_map_rw.erase(ev->fd);
     return 0;
 }
 

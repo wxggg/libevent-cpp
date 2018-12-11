@@ -16,15 +16,15 @@ signal_event::signal_event(event_base *base)
 void signal_event::add()
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
-    this->_base->signalqueue.push_back(this);
-    sigaddset(&this->_base->evsigmask, _sig);
+    this->base->signalqueue.push_back(this);
+    sigaddset(&this->base->evsigmask, _sig);
 }
 
 void signal_event::del()
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
-    this->_base->signalqueue.remove(this);
-    sigdelset(&this->_base->evsigmask, _sig);
+    this->base->signalqueue.remove(this);
+    sigdelset(&this->base->evsigmask, _sig);
     sigaction(_sig, (struct sigaction*)SIG_DFL, NULL);
 }
 

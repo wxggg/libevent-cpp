@@ -16,16 +16,16 @@ namespace eve
 event::event(event_base *base)
 {
 	std::cout << __func__ << std::endl;
-	this->_base = base;
-	this->_pri = _base->activequeues.size() / 2;
+	this->base = base;
+	this->pri = this->base->activequeues.size() / 2;
 }
 
 void event::activate(short ncalls)
 {
     std::cout << __func__ << std::endl;
 
-	_ncalls = ncalls;
-	this->_base->activequeues[_pri].push_back(this);
+	this->ncalls = ncalls;
+	this->base->activequeues[this->pri].push_back(this);
 }
 
 

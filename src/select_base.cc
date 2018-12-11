@@ -184,15 +184,15 @@ int select_base::add(rw_event *ev)
      * Keep track of the highest fd, so that we can calculate the size
      * of the fd_sets for select(2)
      */
-    if (this->_fds < ev->_fd)
-        this->_fds = ev->_fd;
-    if (this->_fdsz - 1 < ev->_fd)
+    if (this->_fds < ev->fd)
+        this->_fds = ev->fd;
+    if (this->_fdsz - 1 < ev->fd)
     {
         int fdsz = this->_fdsz;
         if (fdsz < sizeof(fd_mask))
             fdsz = sizeof(fd_mask);
 
-        int needsize = ((ev->_fd + NFDBITS) / NFDBITS) * sizeof(fd_mask);
+        int needsize = ((ev->fd + NFDBITS) / NFDBITS) * sizeof(fd_mask);
         while (fdsz < needsize)
             fdsz *= 2;
 
@@ -202,13 +202,13 @@ int select_base::add(rw_event *ev)
 
    if (ev->is_readable())
     {
-        FD_SET(ev->_fd, event_readset_in);
-        this->fd_map_rw[ev->_fd] = ev;
+        FD_SET(ev->fd, event_readset_in);
+        this->fd_map_rw[ev->fd] = ev;
     }
     if (ev->is_writable())
     {
-        FD_SET(ev->_fd, event_writeset_in);
-        this->fd_map_rw[ev->_fd] = ev;
+        FD_SET(ev->fd, event_writeset_in);
+        this->fd_map_rw[ev->fd] = ev;
     }
 
     return 0;
@@ -220,14 +220,14 @@ int select_base::del(rw_event *ev)
     check_fdset();
     if (ev->is_readable())
     {
-        FD_CLR(ev->_fd, event_readset_in);
-        fd_map_rw.erase(ev->_fd);
+        FD_CLR(ev->fd, event_readset_in);
+        fd_map_rw.erase(ev->fd);
     }
 
     if (ev->is_writable())
     {
-        FD_CLR(ev->_fd, event_writeset_in);
-        fd_map_rw.erase(ev->_fd);
+        FD_CLR(ev->fd, event_writeset_in);
+        fd_map_rw.erase(ev->fd);
     }
     check_fdset();
 
