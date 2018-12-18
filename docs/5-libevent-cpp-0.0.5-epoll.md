@@ -408,7 +408,7 @@ static int ep_events_transfer(struct eventpoll *ep,
 
 	INIT_LIST_HEAD(&txlist);
 
-	/* Collect/extract ready items */
+	/* Collect/extract ready items 收集item的时候将epi加入txlist，然后会从rdllist移除 */
 	if (ep_collect_ready_items(ep, &txlist, maxevents) > 0) {
 		/* Build result set in userspace */
 		eventcnt = ep_send_events(ep, &txlist, events);
@@ -419,8 +419,47 @@ static int ep_events_transfer(struct eventpoll *ep,
 
 	return eventcnt;
 }
+
 ```
 传送事件简单来说就是首先收集ep中的准备好的链表，然后用txlist链表来汇总，然后遍历txlist来将数据都复制到用户空间指针`struct event_poll *event`。
+
+### 水平触发和边缘触发
+关于水平触发和边缘触发模式，其实与如何通知用户程序事件发生有关，对于select和poll机制只有水平触发模式，为什么呢，因为select和poll机制会不断的轮询文件描述符，调用底层的poll函数时如果发现有数据可读或可写，就会退出`do_select`或`do_poll`函数，这样也就是说只要轮询到描述符可以读或者可以写就会通知用户程序。这样的方式在描述符比较少的时候比较好，而且在少量的描述符很活跃的时候能够持续的进行监控该描述符，对于像tcp通信中的listen和accept这样的操作，使用水平触发比较好。
+
+而对于需要监控大量描述符进行大规模并发的程序来说，使用边沿触发就能够取得非常好的性能。比如对于epoll机制来说，既存在水平触发模式也存在边缘触发，默认情况下采用水平触发，虽然epoll机制内部使用回调机制使得对大规模io复用已经比poll机制要好，但是如果使用水平触发模式，每次文件描述符有数据就通知用户程序，这样如果每次用户操作都只读取少量的数据，文件描述符中一直都有多余的数据，那么就需要不断的通知用户程序，这样其实是很低效的。所以epoll提供了边缘触发模式，也就是只在该文件描述符发生如读写事件时才通知用户程序有事件发生了。
+
+在内核中epoll的两种模式的实现其实比较容易，主要区别就是判断在将事件传给用户程序之后是否继续让该epitem留在准备好的队列中，上面`ep_events_transfer`中，使用`ep_send_events`传给用户程序事件之后有一个重新插入的操作，也就是ep_reinject_items函数。这个函数在将epi从传送队列中一个个解下来的同时会判断是否要重新插入rdllist，关键就在于判断的条件，首先判断`epi->llink`，即判断该epi是否还在eventpoll管理器中，然后判断没有设置`EPOLLET`，EPOLLET也就是边缘触发标志(Edge Triggering)，然后判断返回的事件中包括注册的事件，最后判断这个epi还不在准备队列中，全部满足的话就将其重新加入rdllist中，这一过程说明如果没有在用户程序中主动设置EPOLLET标志的话，使用的是水平触发，epi会重新加入到rdllist中，然后再次执行ep_poll的时候就不会进入for循环了，因为rdllist不空，需要将其中的事件传给用户程序。那么问题来了，水平触发的话什么时候rdllist中才会删除该epi呢，其实还是看这个判断条件，删除的话在前面的收集操作ep_collect_ready_items中会从rdllist中删除epi，现在只要poll操作返回的事件revents中不包含epi注册的事件`epi->event.events`，epi就不会再次加入rdllist中，也就是说文件描述符不再可读或可写rdllist最终会为空。这里的一个问题就是，只要用户程序读取文件描述符的速度追不上其它程序往里面写入的数据的话，epoll机制就会一直不停的通知用户程序文件描述符可读。如果设置成边缘触发的话就会在通知一次之后，等到下次其他程序写入的时候epoll才会通知当前进程可以读了，避免了不停地通知。
+
+```c++
+/*
+ * Walk through the transfer list we collected with ep_collect_ready_items()
+ * and, if 1) the item is still "alive" 2) its event set is not empty 3) it's
+ * not already linked, links it to the ready list. Same as above, we are holding
+ * "sem" so items cannot vanish underneath our nose.
+ */
+static void ep_reinject_items(struct eventpoll *ep, struct list_head *txlist)
+{
+	while (!list_empty(txlist)) { // 遍历传输链表
+		epi = list_entry(txlist->next, struct epitem, txlink);
+		EP_LIST_DEL(&epi->txlink); // 从传输链表中删除
+
+		/*
+		 * If the item is no more linked to the interest set, we don't
+		 * have to push it inside the ready list because the following
+		 * ep_release_epitem() is going to drop it. Also, if the current
+		 * item is set to have an Edge Triggered behaviour, we don't have
+		 * to push it back either.
+		 */
+		if (EP_IS_LINKED(&epi->llink) && !(epi->event.events & EPOLLET) &&
+		    (epi->revents & epi->event.events) && !EP_IS_LINKED(&epi->rdllink)) {
+			list_add_tail(&epi->rdllink, &ep->rdllist);
+			ricnt++;
+		}
+	}
+	if (ricnt)  
+		// 存在再次加入准备好了的队列的epitem，所以rdllist有数据，唤醒 ep->wq 
+}
+```
 
 ## 小结
 总的来说，epoll事件的一整个生命周期到此就结束了，整个机制中比较重要的有两个方面，首先是两个回调函数，一个用于poll机制的回调函数，`poll_wait`中会调用poll或epoll注册的回调函数，而`poll_wait`又会在任何实现了poll的虚拟文件系统中调用，epoll机制注册的回调函数会将epi加入到文件的等待队列中。另外一个回调函数也就是唤醒机制的回调函数，这个epoll注册了自己的回调函数，使得文件在执行write的时候调用内核唤醒函数，最终是执行了epoll的回调函数，而epoll的回调函数会执行自己的唤醒过程。这时候其实就涉及到两条队列，在eventpoll结构中的`ep->wq`实际上保存了等待进程的指针，而前面提到的epi中等待队列的唤醒会调用注册的唤醒函数，这个唤醒函数会唤醒`ep->wq`队列，最终调用默认唤醒函数唤醒等待的进程。

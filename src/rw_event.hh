@@ -1,43 +1,93 @@
+#pragma once
+
 #include "event.hh"
 
 namespace eve
 {
+
+enum TYPE
+{
+	READ = 1,
+	WRITE,
+	RDWR,
+};
+
 class rw_event : public event
 {
   private:
 	bool _read = false;
 	bool _write = false;
 
+	bool _read_enabled = true;
+	bool _write_enabled = true;
+
 	bool _active_read = false;
 	bool _active_write = false;
 
   public:
 	int fd = -1;
+	void *rdata;
+	void *wdata;
+
+	bool epoll_in = false;
+	bool epoll_out = false;
 
   public:
 	rw_event(event_base *base);
-	~rw_event() { std::cout << __func__ << std::endl; }
+	~rw_event() {}
 
-	void set_fd(int fd) { this->fd = fd; }
+	inline void set_fd(int fd) { this->fd = fd; }
 
-	void set_read() { _read = true; }
-	void set_write() { _write = true; }
-	void clear_read() { _read = false; }
-	void clear_write() { _write = false; }
+	inline void set_read() { _read = true; }
+	inline void set_write() { _write = true; }
+	inline void clear_read() { _read = false; }
+	inline void clear_write() { _write = false; }
 
-	void set_active_read() { _active_read = true; }
-	void set_active_write() { _active_write = true; }
-	void clear_active_read() { _active_read = false; }
-	void clear_active_write() { _active_write = false; }
+	inline void set_type(TYPE t)
+	{
+		if (t == READ)
+			_read = true;
+		else if (t == WRITE)
+			_write = true;
+		else if (t == RDWR)
+			_read = _write = true;
+		else
+			_read = _write = false;
+	}
 
-	bool is_readable() { return _read; }
-	bool is_writable() { return _write; }
+	inline void set_active_read() { _active_read = true; }
+	inline void set_active_write() { _active_write = true; }
+	inline void clear_active() { _active_read = _active_write = false; }
 
-	bool has_active_read() { return _active_read; }
-	bool has_active_write() { return _active_write; }
+	inline bool is_readable() const { return _read; }
+	inline bool is_writable() const { return _write; }
+	inline bool is_read_write() const { return _read && _write; }
 
-	void add();
-	void del();
+	inline bool is_read_available() const { return !is_read_write() ? _read : _read && _read_enabled; }
+	inline bool is_write_available() const { return !is_read_write() ? _write : _write && _write_enabled; }
+
+	inline bool is_removeable() const { return !is_read_write() ? true : (!is_read_available() && !is_write_available()); }
+
+	inline bool is_read_active() const { return _active_read; }
+	inline bool is_write_active() const { return _active_write; }
+
+	inline void set(int fd, TYPE t, void (*callback)(event *))
+	{
+		this->fd = fd;
+		set_type(t);
+		this->callback = callback;
+	}
+
+	void add(); 
+	void del(); 
+
+	void activate_read();
+	void activate_write();
+
+	void add_read();
+	void add_write();
+	void del_read();
+	void del_write();
 };
 
 } // namespace eve

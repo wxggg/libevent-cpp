@@ -7,28 +7,6 @@
 namespace eve
 {
 
-int buffer::add_buffer(buffer *inbuf)
-{
-    int res = add(inbuf->_buf, inbuf->_off);
-    if (res == 0)
-        inbuf->drain(inbuf->_off);
-
-    return res;
-}
-
-/* read nread data from the buf, then train the bytes read */
-int buffer::remove(void *data, size_t datlen)
-{
-    size_t nread = datlen;
-    if (nread >= _off)
-        nread = _off;
-
-    memcpy(data, _buf, nread);
-    drain(nread);
-
-    return nread;
-}
-
 /*
  * Reads a line terminated by either '\r\n', '\n\r' or '\r' or '\n'.
  * The returned buffer needs to be freed by the called.
@@ -55,69 +33,25 @@ char *buffer::readline()
     catch (const std::exception &e)
     {
         std::cerr << e.what() << '\n';
-        drain(i);
+        __drain(i);
         return nullptr;
     }
 
     memcpy(line, data, i);
     line[i] = '\0';
-    drain(i + 1);
+    __drain(i + 1);
     return line;
 }
 
-void buffer::align()
-{
-    memmove(_origin_buf, _buf, _off);
-    _buf = _origin_buf;
-    _misalign = 0;
-}
-
-int buffer::expand(size_t datlen)
-{
-    size_t need = _misalign + _off + datlen;
-
-    /* capacity already satisfied */
-    if (_totallen >= need)
-        return 0;
-
-    /**
-         * if the buffer already have enough space
-         * then only need to align the memory
-         */
-    if (_misalign >= datlen)
-    {
-        align();
-    }
-    else
-    {
-        unsigned char *newbuf;
-        size_t length = _totallen;
-
-        if (length < 256)
-            length = 256;
-        while (length < need)
-            length <<= 1;
-
-        if (_origin_buf != _buf)
-            align();
-        if ((newbuf = (unsigned char *)realloc(_buf, length)) == NULL)
-            return -1;
-
-        _origin_buf = _buf = newbuf;
-        _totallen = length;
-    }
-}
-
-int buffer::add(void *data, size_t datlen)
+/* add data to the end of buffer */
+int buffer::push_back(void *data, size_t datlen)
 {
     size_t need = _off + _misalign + datlen;
     size_t oldoff = _off;
 
     if (_totallen < need)
-    {
-        if (expand(datlen) == -1)
+        if (__expand(datlen) == -1)
             return -1;
-    }
 
     memcpy(_buf + _off, data, datlen);
     _off += datlen;
@@ -125,23 +59,25 @@ int buffer::add(void *data, size_t datlen)
     return 0;
 }
 
-/**
- * remove the buf area [_buf, _buf+len]
- */
-void buffer::drain(size_t len)
+int buffer::push_back_buffer(buffer *inbuf)
 {
-    if (len >= _off)
-    {
-        _off = 0;
-        _buf = _origin_buf;
-        _misalign = 0;
-    }
-    else
-    {
-        _buf += len;
-        _misalign += len;
-        _off -= len;
-    }
+    int res = push_back(inbuf->_buf, inbuf->_off);
+    if (res == 0)
+        inbuf->__drain(inbuf->_off);
+
+    return res;
+}
+
+/* read the font content in buffer to data */
+size_t buffer::pop_front(void *data, size_t size)
+{
+    if (_off < size)
+        size = _off;
+    memcpy(data, _buf, size);
+
+    if (size)
+        __drain(size);
+    return size;
 }
 
 /* Reads data from a file descriptor into a buffer. */
@@ -153,7 +89,7 @@ int buffer::readfd(int fd, int howmuch)
     if (howmuch < 0 || howmuch > n)
         howmuch = n;
 
-    if (expand(howmuch) == -1)
+    if (__expand(howmuch) == -1)
         return -1;
 
     unsigned char *p = _buf + _off;
@@ -170,7 +106,7 @@ int buffer::writefd(int fd)
     int n = write(fd, _buf, _off);
     if (n == -1 || n == 0)
         return n;
-    drain(n);
+    __drain(n);
     return n;
 }
 
@@ -190,6 +126,69 @@ unsigned char *buffer::find(unsigned char *what, size_t len)
     }
 
     return NULL;
+}
+
+
+/** private function **/
+
+/**
+ * remove the buf area [_buf, _buf+len]
+ */
+void buffer::__drain(size_t len)
+{
+    if (len >= _off) // drain area bigger then buf to buf+off
+    {
+        _off = 0;
+        _buf = _origin_buf;
+        _misalign = 0;
+    }
+    else
+    {
+        _buf += len;
+        _misalign += len;
+        _off -= len;
+    }
+}
+
+int buffer::__expand(size_t datlen)
+{
+    size_t need = _misalign + _off + datlen;
+
+    /* capacity already satisfied */
+    if (_totallen >= need)
+        return 0;
+
+    /**
+         * if the buffer already have enough space
+         * then only need to align the memory
+         */
+    if (_misalign >= datlen)
+        __align();
+    else
+    {
+        unsigned char *newbuf;
+        size_t length = _totallen;
+
+        if (length < 256)
+            length = 256;
+        while (length < need)
+            length <<= 1;
+
+        if (_origin_buf != _buf)
+            __align();
+        if ((newbuf = (unsigned char *)realloc(_buf, length)) == NULL)
+            return -1;
+
+        _origin_buf = _buf = newbuf;
+        _totallen = length;
+    }
+}
+
+void buffer::__align()
+{
+    memmove(_origin_buf, _buf, _off);
+    _buf = _origin_buf;
+    _misalign = 0;
 }
 
 } // namespace eve

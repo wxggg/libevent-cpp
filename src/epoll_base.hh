@@ -1,9 +1,6 @@
 #include "event_base.hh"
 
 #include <sys/epoll.h>
-#include <sys/time.h>
-
-#include <map>
 
 namespace eve
 {
@@ -17,12 +14,12 @@ class epoll_base : public event_base
     int _nfds;
   public:
     epoll_base();
-    ~epoll_base() {}
+    ~epoll_base();
 
     int add(rw_event *ev);
     int del(rw_event *ev);
     int dispatch(struct timeval *tv);
-    int recalc(int max);
+    int recalc();
 };
 
 } // namespace eve

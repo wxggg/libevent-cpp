@@ -24,7 +24,7 @@ class select_base : public event_base
 
 	int add(rw_event *ev);
 	int del(rw_event *ev);
-	int recalc(int max);
+	int recalc();
 	int dispatch(struct timeval *tv);
 
   private:

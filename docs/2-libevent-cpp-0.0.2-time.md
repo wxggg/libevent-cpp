@@ -35,44 +35,44 @@ class event
 class signal_event : public event
 {
   public:
-    int _sig = -1;
+    int sig = -1;
 
   public:
     signal_event(event_base *base);
     ~signal_event() { std::cout << __func__ << std::endl; }
 
-    void set_sig(int sig) { _sig = sig; }
+    void set_sig(int sig) { sig = sig; }
 
     void add();
     void del();
 };
 ```
-对于任何一个派生的事件类来说都需要重写添加和删除操作，当然在这其中就可以有针对性的进行处理自己独有的操作。对于信号处理来说就是对信号集合 `evsigmask` 的处理，当需要添加事件的时候自然会需要将当前事件的信号类型 `_sig` 使用 `sigaddset` 加入到 `evsigmask` 中，同样在删除的时候要进行删除，并且还需要重置 `_sig` 类型事件的处理函数，重置为 `(struct sigaction*)SIG_DFL`。当然还需要分别从信号事件队列 `signalqueue`中对事件进行增删。
+对于任何一个派生的事件类来说都需要重写添加和删除操作，当然在这其中就可以有针对性的进行处理自己独有的操作。对于信号处理来说就是对信号集合 `evsigmask` 的处理，当需要添加事件的时候自然会需要将当前事件的信号类型 `sig` 使用 `sigaddset` 加入到 `evsigmask` 中，同样在删除的时候要进行删除，并且还需要重置 `sig` 类型事件的处理函数，重置为 `(struct sigaction*)SIG_DFL`。当然还需要分别从信号事件队列 `signalqueue`中对事件进行增删。
 ```c++
 void signal_event::add()
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
     this->base->signalqueue.push_back(this);
-    sigaddset(&this->base->evsigmask, _sig);
+    sigaddset(&this->base->evsigmask, sig);
 }
 
 void signal_event::del()
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
     this->base->signalqueue.remove(this);
-    sigdelset(&this->base->evsigmask, _sig);
-    sigaction(_sig, (struct sigaction*)SIG_DFL, NULL);
+    sigdelset(&this->base->evsigmask, sig);
+    sigaction(sig, (struct sigaction*)SIG_DFL, NULL);
 }
 ```
 
 ## time_event-超时事件的生命周期
-对于时间事件其实一般都是指的超时事件，在libevent中可以设置多个超时时钟，然后根据设置时钟的先后顺序先后进行处理，libevent主要是对于Linux（或其他平台）时间处理进行了封装，首先对于一个时间事件最重要的元素在于 `struct timeval _timeout` ，也就是在何时超时，对于是否超时的判断也是围绕着这一数据进行。
+对于时间事件其实一般都是指的超时事件，在libevent中可以设置多个超时时钟，然后根据设置时钟的先后顺序先后进行处理，libevent主要是对于Linux（或其他平台）时间处理进行了封装，首先对于一个时间事件最重要的元素在于 `struct timeval timeout` ，也就是在何时超时，对于是否超时的判断也是围绕着这一数据进行。
 ```c++
 class time_event : public event
 {
 
   public:
-    struct timeval _timeout;
+    struct timeval timeout;
 
   public:
     time_event(event_base *base);
@@ -113,7 +113,7 @@ int main(int argc, char **argv)
 	base.loop(0);
 }
 ```
-初始化的过程其实就是设置时钟和回调函数的过程，可以看一下时钟的设置，其实就是要设置`_timeout`的值，就是在获取当前时间的基础上在`tv_sec`上加上对应时钟的数值就行了。
+初始化的过程其实就是设置时钟和回调函数的过程，可以看一下时钟的设置，其实就是要设置`timeout`的值，就是在获取当前时间的基础上在`tv_sec`上加上对应时钟的数值就行了。
 ```c++
 void time_event::set_timer(int nsec)
 {
@@ -123,12 +123,12 @@ void time_event::set_timer(int nsec)
     timerclear(&tv);
     tv.tv_sec = nsec;
 
-    timeradd(&now, &tv, &_timeout);
+    timeradd(&now, &tv, &timeout);
 }
 ```
 
 ### 有序的超时事件
-然后就可以将事件加入到事件管理器中了，参照libevent中对时间的管理，libevent中使用了红黑树RBTree来管理超时事件，红黑树的一个特点是有序，另一个特点是高效，对于时间事件来说，需要一个有序的结构根据时间的前后顺序来保存，而且希望能够高效的进行增删，因而红黑树是不错的选择。对于C++ stl库来说，使用`set` 其实就能够达到同样的效果，因为`set`的底层实现同样是红黑树，但是`set`有序的前提是提供一个比较的结构，也就是如下的`cmp_timeev`结构，使用Linux的`timercmp`来比较时间事件的`_timeout`成员，对应着`time_event`的比较，从而最终 `set` 中时间事件根据`timeout`来排序。
+然后就可以将事件加入到事件管理器中了，参照libevent中对时间的管理，libevent中使用了红黑树RBTree来管理超时事件，红黑树的一个特点是有序，另一个特点是高效，对于时间事件来说，需要一个有序的结构根据时间的前后顺序来保存，而且希望能够高效的进行增删，因而红黑树是不错的选择。对于C++ stl库来说，使用`set` 其实就能够达到同样的效果，因为`set`的底层实现同样是红黑树，但是`set`有序的前提是提供一个比较的结构，也就是如下的`cmp_timeev`结构，使用Linux的`timercmp`来比较时间事件的`timeout`成员，对应着`time_event`的比较，从而最终 `set` 中时间事件根据`timeout`来排序。
 
 ```c++
 struct cmp_timeev
@@ -143,7 +143,7 @@ class event_base
 
 bool cmp_timeev::operator()(time_event *const &lhs, time_event *const &rhs) const
 {
-	return timercmp(&lhs->_timeout, &rhs->_timeout, <);
+	return timercmp(&lhs->timeout, &rhs->timeout, <);
 }
 ```
 
@@ -168,8 +168,8 @@ while (!done)
          *  means have some active timeout event need to be 
          *  processed, so do not dispatch, because dispatch 
          *  will wait until the next timeout appear */
-        if (timercmp(&(timeev->_timeout), &now, >)) {
-            timersub(&(timeev->_timeout), &now, &off);
+        if (timercmp(&(timeev->timeout), &now, >)) {
+            timersub(&(timeev->timeout), &now, &off);
             /* attach timeout is off */
             res = this->dispatch(&off);
         }
@@ -205,7 +205,7 @@ void event_base::timeout_process()
 	while (i != timeevset.end())
 	{
 		ev = *i;
-		if (timercmp(&ev->_timeout, &now, >))
+		if (timercmp(&ev->timeout, &now, >))
 			break;
 		i = timeevset.erase(i);
 		ev->activate(EV_TIMEOUT, 1);

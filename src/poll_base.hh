@@ -15,12 +15,12 @@ class poll_base : public event_base
     std::map<int, struct pollfd *> fd_map_poll;
 
   public:
-    poll_base();
-    ~poll_base();
+    poll_base() {}
+    ~poll_base() {}
 
     int add(rw_event *ev);
     int del(rw_event *ev);
-    int recalc(int max);
+    int recalc();
     int dispatch(struct timeval *tv);
 
   private:

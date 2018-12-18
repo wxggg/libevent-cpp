@@ -5,39 +5,49 @@ namespace eve
 
 #define BUFFER_MAX_READ 4096
 
+#define DEFAULT_BUF_SIZE 128
+
 class buffer
 {
-  private:
-    unsigned char *_origin_buf;
-    unsigned char *_buf;
-    size_t _misalign;
-    size_t _off;
-    size_t _totallen;
+private:
+	unsigned char *_origin_buf;
+	unsigned char *_buf;
+	size_t _misalign = 0;
+	size_t _off = 0;
+	size_t _totallen=0;
 
-  private:
-    void align();
+private:
+	void __align();
+	int __expand(size_t datlen);
+	void __drain(size_t len);
 
-  public:
-    buffer(/* args */)
-    {
-        _origin_buf = new unsigned char[128];
-    }
-    ~buffer()
-    {
-        delete _origin_buf;
-    }
-    int add_buffer(buffer *inbuf);
-    int remove(void *data, size_t datlen);
-    char *readline();
-    int expand(size_t datlen);
-    int add(void *data, size_t datlen);
-    void drain(size_t len);
+public:
+	buffer()
+	{
+		_totallen = DEFAULT_BUF_SIZE;
+		_origin_buf = new unsigned char[_totallen];
+		_buf = _origin_buf;
+	}
+	~buffer()
+	{
+		delete _origin_buf;
+	}
+	int remove(void *data, size_t datlen);
+	char *readline();
 
-    /* operation with file descriptior */
-    int readfd(int fd, int howmuch);
-    int writefd(int fd);
+	/* operation with file descriptior */
+	int readfd(int fd, int howmuch);
+	int writefd(int fd);
 
-    unsigned char *find(unsigned char *what, size_t len);
+	/* push_back and pop_front */
+	int push_back(void *data, size_t datlen);
+	int push_back_buffer(buffer *inbuf);
+	size_t pop_front(void *data, size_t size);
+
+	unsigned char *find(unsigned char *what, size_t len);
+
+	inline int get_off() const { return _off; }
+
 };
 
 } // namespace eve

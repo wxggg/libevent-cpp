@@ -14,17 +14,16 @@
 namespace eve
 {
 
+#define MAX_SELECT_FD 1024
+
 select_base::select_base()
-    : event_base()
 {
-    std::cout << __func__ << std::endl;
     int fdsz = ((32 + NFDBITS) / sizeof(NFDBITS)) * sizeof(fd_mask);
     resize(fdsz);
 }
 
 select_base::~select_base()
 {
-    std::cout << __func__ << std::endl;
     free(event_readset_in);
     free(event_writeset_in);
     free(event_readset_out);
@@ -33,12 +32,11 @@ select_base::~select_base()
 
 void select_base::check_fdset()
 {
-    std::cout << __func__ << std::endl;
     bool iread = false, iwrite = false;
 
     for (auto kv : fd_map_rw)
     {
-        std::cout << "kv:" << kv.first << " " << kv.second << std::endl;
+        // std::cout << "kv:" << kv.first << " " << kv.second << std::endl;
         iread = false, iwrite = false;
         if (FD_ISSET(kv.first, event_readset_in))
             iread = true;
@@ -62,19 +60,14 @@ void select_base::check_fdset()
     }
 }
 
-int select_base::recalc(int max)
+int select_base::recalc()
 {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
-    check_fdset();
+    // check_fdset();
     return evsignal_recalc();
 }
 
 int select_base::dispatch(struct timeval *tv)
 {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
-
-    check_fdset();
-
     memcpy(event_readset_out, event_readset_in, _fdsz);
     memcpy(event_writeset_out, event_writeset_in, _fdsz);
 
@@ -88,20 +81,19 @@ int select_base::dispatch(struct timeval *tv)
 
     int res = select(_fds + 1, event_readset_out, event_writeset_out, NULL, tv);
 
-    check_fdset();
+    // check_fdset();
 
     if (evsignal_recalc() == -1)
     {
-        std::cout << "evsig->recalc() error\n";
+        std::cerr << "evsig->recalc() error\n";
         return -1;
     }
 
     if (res == -1)
     {
-        std::cout << "select res=-1\n";
         if (errno != EINTR)
         {
-            std::cout << "select error errno=" << errno << std::endl;
+            std::cerr << "select error errno=" << errno << std::endl;
             return -1;
         }
         evsignal_process();
@@ -113,7 +105,7 @@ int select_base::dispatch(struct timeval *tv)
         evsignal_process();
     }
 
-    check_fdset();
+    // check_fdset();
     bool iread, iwrite;
     rw_event *ev;
 
@@ -128,12 +120,13 @@ int select_base::dispatch(struct timeval *tv)
         if ((iread || iwrite) && kv.second)
         {
             ev = kv.second;
+            ev->clear_active();
             if (iread && ev->is_readable())
-                ev->set_active_read();
+                ev->activate_read();
             if (iwrite && ev->is_writable())
-                ev->set_active_write();
+                ev->activate_write();
 
-            if (ev->has_active_read() || ev->has_active_write())
+            if (ev->is_read_active() || ev->is_write_active())
             {
                 if (!ev->is_persistent())
                     ev->del();
@@ -142,17 +135,15 @@ int select_base::dispatch(struct timeval *tv)
         }
     }
 
-    check_fdset();
+    // check_fdset();
 
     return 0;
 }
 
 int select_base::resize(int fdsz)
 {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
-
-    if (event_readset_in)
-        check_fdset();
+    // if (event_readset_in)
+    //     check_fdset();
 
     fd_set *newset = nullptr;
     newset = (fd_set *)realloc(event_readset_in, fdsz);
@@ -172,14 +163,18 @@ int select_base::resize(int fdsz)
 
     this->_fdsz = fdsz;
 
-    check_fdset();
+    // check_fdset();
 
     return 0;
 }
 
 int select_base::add(rw_event *ev)
 {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
+    if (ev->fd > MAX_SELECT_FD)
+    {
+        std::cerr << "select warning: added fd>" << MAX_SELECT_FD << std::endl;
+        exit(-1);
+    }
     /*
      * Keep track of the highest fd, so that we can calculate the size
      * of the fd_sets for select(2)
@@ -200,12 +195,12 @@ int select_base::add(rw_event *ev)
             this->resize(fdsz);
     }
 
-   if (ev->is_readable())
+    if (ev->is_read_available())
     {
         FD_SET(ev->fd, event_readset_in);
         this->fd_map_rw[ev->fd] = ev;
     }
-    if (ev->is_writable())
+    if (ev->is_write_available())
     {
         FD_SET(ev->fd, event_writeset_in);
         this->fd_map_rw[ev->fd] = ev;
@@ -216,20 +211,14 @@ int select_base::add(rw_event *ev)
 
 int select_base::del(rw_event *ev)
 {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
-    check_fdset();
-    if (ev->is_readable())
-    {
-        FD_CLR(ev->fd, event_readset_in);
-        fd_map_rw.erase(ev->fd);
-    }
+    // check_fdset();
 
-    if (ev->is_writable())
-    {
+    if (!ev->is_read_available())
+        FD_CLR(ev->fd, event_readset_in);
+
+    if (!ev->is_write_available())
         FD_CLR(ev->fd, event_writeset_in);
-        fd_map_rw.erase(ev->fd);
-    }
-    check_fdset();
+    // check_fdset();
 
     return 0;
 }

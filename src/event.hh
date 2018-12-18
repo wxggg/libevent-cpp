@@ -11,37 +11,61 @@
 namespace eve
 {
 
+enum ERR {
+	E_EOF = -127,
+	E_TIMEOUT = -126,
+	E_UNKNOW,
+};
+
 class event_base;
 class event
 {
-  private:
+private:
+	static int _internal_event_id;
 	bool _persistent = false;
+	bool _active = false;
 
-  public:
+public:
+	int id;
 	event_base *base;
 	short ncalls = 0;
 	int pri; /* smaller numbers means higher priority */
 
-	void (*callback)(void *arg);
+	void (*callback)(event *ev);
 	int res; /* result passed to event callback */
 
 	short *ev_pncalls; /* allows deletes in callback */
 
-  public:
+	void *data; /* can be used to store anything */
+
+	int err = -1;
+
+public:
 	event(event_base *base);
-	virtual ~event() { std::cout << __func__ << std::endl; }
+	virtual ~event() {}
 
-	void set_base(event_base *base) { this->base = base; }
-	void set_callback(void (*callback)(void *)) { this->callback = callback; }
+	inline void set_base(event_base *base) { this->base = base; }
+	inline void set_callback(void (*callback)(event *)) { this->callback = callback; }
 
-	void set_persistent() { _persistent = true; }
-	void clear_persistent() { _persistent = false; }
-	bool is_persistent() { return _persistent; }
+	inline void set_active() { _active = true; }
+	inline void clear_active() { _active = false; }
+	inline bool is_active() { return _active; }
 
-	virtual void add()=0;
-	virtual void del()=0;
+	inline void set_persistent() { _persistent = true; }
+	inline void clear_persistent() { _persistent = false; }
+	inline bool is_persistent() const { return _persistent; }
 
+	virtual void add() = 0;
+	virtual void del() = 0;
+
+	void set_priority(int pri);
 	void activate(short ncalls);
+
+
+	static void default_callback(event *ev)
+	{
+		std::cerr<<"warning: event id="<<ev->id<<" called default callback\n";
+	}
 };
 
 } // namespace eve

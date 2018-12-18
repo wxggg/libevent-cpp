@@ -79,7 +79,7 @@ int select_base::dispatch(struct timeval *tv)
             if (iwrite && ev->is_writable())
                 ev->set_active_write();
 
-            if (ev->has_active_read() || ev->has_active_write())
+            if (ev->is_read_active() || ev->is_write_active())
             {
                 if (!ev->is_persistent())
                     ev->del();

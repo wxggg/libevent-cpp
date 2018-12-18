@@ -6,27 +6,16 @@
 namespace eve
 {
 
-poll_base::poll_base()
-    : event_base()
+int poll_base::recalc()
 {
-}
-
-poll_base::~poll_base()
-{
-}
-
-int poll_base::recalc(int max)
-{
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
-    poll_check();
+    // poll_check();
     return evsignal_recalc();
 }
 
 void poll_base::poll_check()
 {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
     rw_event *ev = nullptr;
-    struct pollfd *pfd = nullptr;
+    struct pollfd *pfd;
     int fd = -1;
     for (auto kv : fd_map_poll)
     {
@@ -47,7 +36,7 @@ void poll_base::poll_check()
 
 int poll_base::dispatch(struct timeval *tv)
 {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
+    // std::cout << __PRETTY_FUNCTION__ << std::endl;
     if (evsignal_deliver() == -1)
         return -1;
 
@@ -55,7 +44,7 @@ int poll_base::dispatch(struct timeval *tv)
     if (tv)
         sec = tv->tv_sec * 1000 + (tv->tv_usec + 999) / 1000;
 
-    poll_check();
+    // poll_check();
 
     int nfds = fd_map_poll.size();
     struct pollfd fds[nfds];
@@ -64,7 +53,6 @@ int poll_base::dispatch(struct timeval *tv)
         fds[i++] = *kv.second;
 
     int res = poll(fds, nfds, sec);
-
     if (evsignal_recalc() == -1)
         return -1;
 
@@ -92,15 +80,16 @@ int poll_base::dispatch(struct timeval *tv)
         ev = fd_map_rw[fds[i].fd];
         if (what && ev)
         {
+            ev->clear_active();
             /* if the file gets closed notify */
             if (what & (POLLHUP | POLLERR))
                 what |= POLLIN | POLLOUT;
             if ((what & POLLIN) && ev->is_readable())
-                ev->set_active_read();
+                ev->activate_read();
             if ((what & POLLOUT) && ev->is_writable())
-                ev->set_active_write();
+                ev->activate_write();
 
-            if (ev->has_active_read() || ev->has_active_write())
+            if (ev->is_read_active() || ev->is_write_active())
             {
                 if (!ev->is_persistent())
                     ev->del();
@@ -113,17 +102,19 @@ int poll_base::dispatch(struct timeval *tv)
 
 int poll_base::add(rw_event *ev)
 {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
-    fd_map_rw[ev->fd] = ev;
-    struct pollfd *pfd = new struct pollfd;
-    pfd->fd = ev->fd;
-    pfd->events = 0;
-    pfd->revents = 0;
-    fd_map_poll[ev->fd] = pfd;
+    struct pollfd *pfd = fd_map_poll[ev->fd];
+    if (!pfd)
+    {
+        pfd = new struct pollfd;
+        pfd->fd = ev->fd;
+        pfd->events = 0;
+        pfd->revents = 0;
+        fd_map_poll[ev->fd] = pfd;
+    }
 
-    if (ev->is_readable())
+    if (ev->is_read_available())
         pfd->events |= POLLIN;
-    if (ev->is_writable())
+    if (ev->is_write_available())
         pfd->events |= POLLOUT;
 
     return 0;
@@ -131,10 +122,22 @@ int poll_base::add(rw_event *ev)
 
 int poll_base::del(rw_event *ev)
 {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
-    delete fd_map_poll[ev->fd];
-    fd_map_poll.erase(ev->fd);
-    fd_map_rw.erase(ev->fd);
+    if (ev->is_removeable())
+    {
+        delete fd_map_poll[ev->fd];
+        fd_map_poll.erase(ev->fd);
+    }
+    else
+    {
+        struct pollfd *pfd = fd_map_poll[ev->fd];
+        if (!pfd)
+            return 1;
+        if (!ev->is_read_available())
+            pfd->events &= ~POLLIN;
+        if (!ev->is_write_available())
+            pfd->events &= ~POLLOUT;
+    }
+
     return 0;
 }
 

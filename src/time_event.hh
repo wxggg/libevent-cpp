@@ -7,15 +7,13 @@ class time_event : public event
 {
 
   public:
-    struct timeval _timeout;
+    struct timeval timeout;
 
   public:
     time_event(event_base *base);
-    ~time_event() { std::cout << __func__ << std::endl; }
+    ~time_event() {}
 
-    void set_timer(int nsec);
-
-    struct timeval *timer_left();
+    void set_timer(int sec, int usec);
 
     void add();
     void del();

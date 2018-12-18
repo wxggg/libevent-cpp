@@ -36,7 +36,7 @@ class event_base
   public:
 	int event_count;		/* counts of total events */
 	int event_count_active; /* counts of active events */
-	int event_gotterm;		/* Set to terminate loop */
+	int terminated;		/* Set to terminate loop */
 
 	std::vector<std::list<event *>> activequeues;
 	std::list<event *> eventqueue;
