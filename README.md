@@ -7,7 +7,7 @@ libevent library reimplemented with c++
 * [libevent-cpp poll封装及Linux内核实现原理](docs/4-libevent-cpp-0.0.4-poll.md)
 * [libevent-cpp epoll机制及其在Linux内核中的实现](docs/5-libevent-cpp-0.0.5-epoll.md)
 
-## 2018-12-9 更新
+## 2018-12-18 更新
 基本完成libevent-1.1b版本的cpp实现，主要包括如下内容:
 * 三种类型事件，分别为时间事件、信号事件以及读写事件
 * 另外还有针对文件描述符读写的缓冲事件及缓冲区，本质上还是读写事件
