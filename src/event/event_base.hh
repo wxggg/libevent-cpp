@@ -1,13 +1,13 @@
 #pragma once
 
 #include <signal.h>
-#include <sys/time.h>
 
 #include <vector>
 #include <list>
 #include <set>
 #include <map>
 #include <iostream>
+#include <utility>
 
 namespace eve
 {
@@ -25,12 +25,12 @@ struct cmp_timeev
 
 class event_base
 {
-private:
+  private:
 	bool _loop_nonblock = false;
 	bool _loop_once = false;
 	bool _terminated = false;
 
-public:
+  public:
 	void set_terminated(bool flag) { _terminated = flag; }
 
 	std::vector<std::list<event *>> activequeues;
@@ -42,16 +42,16 @@ public:
 	sigset_t evsigmask;
 	rw_event *readsig;
 
-	static short evsigcaught[NSIG];
+	static std::vector<int> sigcaught;
 	static volatile sig_atomic_t caught;
-	static int ev_signal_pair[2];
+	static std::pair<int, int> signal_pair;
 	static int needrecalc;
 
-	std::map<int, rw_event *> fd_map_rw;
 	int _fds = 0; /* highest fd of added rw_event */
 	int _fdsz = 0;
+	std::map<int, rw_event *> fd_map_rw;
 
-public:
+  public:
 	event_base();
 	virtual ~event_base(){};
 	virtual int add(rw_event *) { return 0; }
@@ -62,7 +62,14 @@ public:
 	int count_rw_events() { return fd_map_rw.size(); }
 
 	int priority_init(int npriorities);
+
 	int loop();
+	inline void loop_nonblock_and_once()
+	{
+		set_loop_nonblock();
+		loop();
+		clear_loop_flags();
+	}
 
 	void event_process_active();
 	void timeout_process();
@@ -84,15 +91,14 @@ public:
 		return ret;
 	}
 
-protected:
+  protected:
 	void evsignal_process();
 	int evsignal_recalc();
 	int evsignal_deliver();
 
-private:
+  private:
 	static void handler(int sig);
 	static void readsig_cb(event *argev);
-
 };
 
 } // namespace eve

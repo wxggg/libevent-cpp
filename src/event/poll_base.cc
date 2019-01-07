@@ -44,14 +44,14 @@ int poll_base::dispatch(struct timeval *tv)
     if (tv)
         sec = tv->tv_sec * 1000 + (tv->tv_usec + 999) / 1000;
 
-    // poll_check();
+    poll_check();
 
     int nfds = fd_map_poll.size();
     struct pollfd fds[nfds];
     int i = 0;
     for (const auto kv : fd_map_poll)
         fds[i++] = *kv.second;
-
+        
     int res = poll(fds, nfds, sec);
     if (evsignal_recalc() == -1)
         return -1;

@@ -1,4 +1,6 @@
-#include "event.hh"
+#pragma once
+
+#include <event.hh>
 
 namespace eve
 {
@@ -11,12 +13,12 @@ class time_event : public event
 
   public:
     time_event(event_base *base);
-    ~time_event() {}
+    ~time_event();
 
     void set_timer(int sec, int usec);
 
-    void add();
-    void del();
+    int add();
+    int del();
 };
 
 } // namespace eve

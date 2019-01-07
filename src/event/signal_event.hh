@@ -9,7 +9,7 @@ public:
 
 public:
 	signal_event(event_base *base);
-	~signal_event() {}
+	~signal_event();
 
 	inline void set_sig(int sig) { this->sig = sig; }
 
@@ -19,8 +19,8 @@ public:
 		this->callback = callback;
 	}
 
-	void add();
-	void del();
+	int add();
+	int del();
 };
 
 } // namespace eve

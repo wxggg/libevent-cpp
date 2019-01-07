@@ -1,5 +1,5 @@
-#include "time_event.hh"
-#include "event_base.hh"
+#include <time_event.hh>
+#include <event_base.hh>
 
 #include <sys/time.h>
 
@@ -11,6 +11,11 @@ time_event::time_event(event_base *base)
     : event(base)
 {
     timerclear(&timeout);
+}
+
+time_event::~time_event()
+{
+    del();
 }
 
 void time_event::set_timer(int sec, int usec)
@@ -25,14 +30,16 @@ void time_event::set_timer(int sec, int usec)
     timeradd(&now, &tv, &timeout);
 }
 
-void time_event::add()
+int time_event::add()
 {
     this->base->timeevset.insert(this);
+    return 0;
 }
 
-void time_event::del()
+int time_event::del()
 {
     this->base->timeevset.erase(this);
+    return 0;
 }
 
 } // namespace eve

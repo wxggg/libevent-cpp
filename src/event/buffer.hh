@@ -1,4 +1,6 @@
-#include <sys/types.h>
+#pragma once
+
+#include <string>
 
 namespace eve
 {
@@ -9,19 +11,19 @@ namespace eve
 
 class buffer
 {
-private:
+  private:
 	unsigned char *_origin_buf;
 	unsigned char *_buf;
 	size_t _misalign = 0;
 	size_t _off = 0;
-	size_t _totallen=0;
+	size_t _totallen = 0;
 
-private:
+  private:
 	void __align();
 	int __expand(size_t datlen);
 	void __drain(size_t len);
 
-public:
+  public:
 	buffer()
 	{
 		_totallen = DEFAULT_BUF_SIZE;
@@ -32,8 +34,9 @@ public:
 	{
 		delete _origin_buf;
 	}
+	void reset();
 	int remove(void *data, size_t datlen);
-	char *readline();
+	std::string readline();
 
 	/* operation with file descriptior */
 	int readfd(int fd, int howmuch);
@@ -41,13 +44,22 @@ public:
 
 	/* push_back and pop_front */
 	int push_back(void *data, size_t datlen);
-	int push_back_buffer(buffer *inbuf);
+	int push_back_buffer(buffer *inbuf, size_t datlen);
+	inline int push_back_string(const std::string &s)
+	{
+		return push_back((void *)s.c_str(), s.size());
+	}
 	size_t pop_front(void *data, size_t size);
 
 	unsigned char *find(unsigned char *what, size_t len);
+	inline unsigned char *find_string(const std::string & what)
+	{
+		return find((unsigned char *)what.c_str(), what.length());
+	}
 
 	inline int get_off() const { return _off; }
-
+	inline int get_length() const { return _off; }
+	inline const char *get_data() const { return (const char *)_buf; }
 };
 
 } // namespace eve

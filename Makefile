@@ -10,13 +10,13 @@ SRC_PATH = src
 # Space-separated pkg-config libraries used by this project
 LIBS =
 # General compiler flags
-COMPILE_FLAGS = -std=c++11 -Wall -Wextra -fPIC -g
+COMPILE_FLAGS = -std=c++14 -Wall -Wextra -fPIC -g 
 # Additional release-specific flags
 RCOMPILE_FLAGS = -D NDEBUG
 # Additional debug-specific flags
 DCOMPILE_FLAGS = -D DEBUG
 # Add additional include paths
-INCLUDES = -I src
+INCLUDES = -Isrc/event -Isrc/http -Isrc/util
 # General linker settings
 LINK_FLAGS = -shared -fPIC -ldl
 # Additional release-specific linker settings

@@ -8,24 +8,34 @@ buffer_event::buffer_event(event_base *base)
 {
     this->callback = buffer_event_cb;
     this->readcb = this->writecb = this->errorcb = default_cb;
+
+    this->input_buffer = new buffer();
+    this->output_buffer = new buffer();
+}
+
+buffer_event::~buffer_event()
+{
+    delete input_buffer;
+    delete output_buffer;
 }
 
 size_t buffer_event::write(void *data, size_t size)
 {
     // std::cout << __PRETTY_FUNCTION__ << std::endl;
-    int res = obuf.push_back(data, size);
+    int res = output_buffer->push_back(data, size);
 
     if (res == -1)
-        return res;
+        return -1;
 
     if (size > 0 && is_writable())
         this->add();
+    return res;
 }
 
 size_t buffer_event::read(void *data, size_t size)
 {
     // std::cout << __PRETTY_FUNCTION__ << std::endl;
-    return ibuf.pop_front(data, size);
+    return input_buffer->pop_front(data, size);
 }
 
 void buffer_event::buffer_event_cb(event *argev)
@@ -36,8 +46,7 @@ void buffer_event::buffer_event_cb(event *argev)
 
     if (ev->is_read_active())
     {
-        res = ev->ibuf.readfd(ev->fd, -1); // -1 means read max
-
+        res = ev->input_buffer->readfd(ev->fd, -1); // -1 means read max
         if (res > 0)
         {
             ev->add_read();
@@ -59,11 +68,10 @@ void buffer_event::buffer_event_cb(event *argev)
 
     if (ev->is_write_active() && ev->get_obuf_length() > 0)
     {
-        res = ev->obuf.writefd(ev->fd);
+        res = ev->output_buffer->writefd(ev->fd);
         if (res > 0)
         {
-            if (ev->get_obuf_length() > 0)
-                ev->add_write();
+            ev->add_write();
             (*ev->writecb)(ev);
         }
         else
@@ -83,7 +91,12 @@ void buffer_event::buffer_event_cb(event *argev)
 
 void buffer_event::default_cb(buffer_event *ev)
 {
-    std::cerr << "error: defualt event buffer callback called\n";
+    std::cerr << "--error: defualt event buffer callback called\n";
+    std::cout << "--ev: fd=" << ev->fd << std::endl;
+    if (ev->is_read_active())
+        std::cout << "read active\n";
+    if (ev->is_write_active())
+        std::cout << "write active\n";
 }
 
 } // namespace eve

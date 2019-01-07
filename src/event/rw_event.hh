@@ -32,11 +32,14 @@ class rw_event : public event
 	bool epoll_in = false;
 	bool epoll_out = false;
 
+	int timeout = -1;
+
   public:
 	rw_event(event_base *base);
-	~rw_event() {}
+	~rw_event();
 
 	inline void set_fd(int fd) { this->fd = fd; }
+	inline void set_timeout(int sec) { this->timeout = sec; }
 
 	inline void set_read() { _read = true; }
 	inline void set_write() { _write = true; }
@@ -78,16 +81,16 @@ class rw_event : public event
 		this->callback = callback;
 	}
 
-	void add(); 
-	void del(); 
+	int add();
+	int del();
 
 	void activate_read();
 	void activate_write();
 
-	void add_read();
-	void add_write();
-	void del_read();
-	void del_write();
+	int add_read();
+	int add_write();
+	int del_read();
+	int del_write();
 };
 
 } // namespace eve

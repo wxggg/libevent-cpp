@@ -12,17 +12,22 @@ signal_event::signal_event(event_base *base)
 {
 }
 
-void signal_event::add()
+signal_event::~signal_event()
 {
-    this->base->signalqueue.push_back(this);
-    sigaddset(&this->base->evsigmask, sig);
+    del();
 }
 
-void signal_event::del()
+int signal_event::add()
+{
+    this->base->signalqueue.push_back(this);
+    return sigaddset(&this->base->evsigmask, sig);
+}
+
+int signal_event::del()
 {
     this->base->signalqueue.remove(this);
     sigdelset(&this->base->evsigmask, sig);
-    sigaction(sig, (struct sigaction*)SIG_DFL, NULL);
+    return sigaction(sig, (struct sigaction*)SIG_DFL, NULL);
 }
 
 

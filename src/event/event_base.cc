@@ -1,20 +1,20 @@
-#include "event_base.hh"
-#include "rw_event.hh"
-#include "signal_event.hh"
-#include "time_event.hh"
+#include <event_base.hh>
+#include <rw_event.hh>
+#include <signal_event.hh>
+#include <time_event.hh>
+#include <util_network.hh>
 
-#include <sys/socket.h>
-#include <string.h>
-#include <unistd.h>
 
+#include <string>
+#include <cstring>
 #include <iostream>
 
 namespace eve
 {
 
-short event_base::evsigcaught[NSIG];
 volatile sig_atomic_t event_base::caught = 0;
-int event_base::ev_signal_pair[2];
+std::vector<int> event_base::sigcaught = {};
+std::pair<int, int> event_base::signal_pair;
 int event_base::needrecalc = 0;
 
 bool cmp_timeev::operator()(time_event *const &lhs, time_event *const &rhs) const
@@ -27,11 +27,11 @@ event_base::event_base()
 	priority_init(1); // default have 1 activequeues
 	sigemptyset(&evsigmask);
 
-	if (socketpair(AF_UNIX, SOCK_STREAM, 0, ev_signal_pair) == -1)
-		std::cout << __func__ << " socketpair error\n";
+	signal_pair = get_fdpair();
+	sigcaught.resize(NSIG);
 
 	readsig = new rw_event(this);
-	readsig->set(ev_signal_pair[1], READ, readsig_cb);
+	readsig->set(signal_pair.second, READ, readsig_cb);
 	// readsig->add();
 }
 
@@ -60,11 +60,11 @@ int event_base::loop()
 	static int i = 0;
 	while (!done && i++ < 1000)
 	{
-		// std::cout << "loop" << i << std::endl;
+		std::cout <<"\n[event]"<< " loop" << i << std::endl;
 		/* Terminate the loop if we have been asked to */
 		if (this->_terminated)
 		{
-			std::cout << "event got terminated\n";
+			std::cout << "[event] event got terminated\n";
 			set_terminated(false);
 			break;
 		}
@@ -74,7 +74,7 @@ int event_base::loop()
 		/* If we have no events, we just exit */
 		if (signalqueue.empty() && timeevset.empty() && !count_rw_events() && !nactive_events)
 		{
-			// std::cout << "have no events, just exit\n";
+			std::cout << "[event] have no events, just exit\n";
 			return 1;
 		}
 
@@ -109,7 +109,7 @@ int event_base::loop()
 
 		if (res == -1)
 		{
-			std::cout << "dispatch exit res=" << res << std::endl;
+			std::cout << "[event] dispatch exit res=" << res << std::endl;
 			return -1;
 		}
 
@@ -127,7 +127,7 @@ int event_base::loop()
 
 		if (this->recalc() == -1)
 		{
-			std::cout << "recalc exited -1\n";
+			std::cout << "[event] recalc exited -1\n";
 			return -1;
 		}
 	}
@@ -137,7 +137,6 @@ int event_base::loop()
 
 void event_base::timeout_process()
 {
-	// std::cout<<__PRETTY_FUNCTION__<<std::endl;
 	struct timeval now;
 	gettimeofday(&now, NULL);
 
@@ -197,7 +196,7 @@ void event_base::evsignal_process()
 	while (i != signalqueue.end())
 	{
 		sigev = *i;
-		ncalls = evsigcaught[sigev->sig];
+		ncalls = sigcaught[sigev->sig];
 		if (ncalls)
 		{
 			if (!(sigev->is_persistent()))
@@ -207,7 +206,7 @@ void event_base::evsignal_process()
 		i++;
 	}
 
-	memset(this->evsigcaught, 0, sizeof(evsigcaught));
+	std::fill(sigcaught.begin(), sigcaught.end(), 0);
 	caught = 0;
 }
 
@@ -221,7 +220,7 @@ int event_base::evsignal_recalc()
 
 	struct sigaction sa;
 	/* Reinstall our signal handler. */
-	memset(&sa, 0, sizeof(sa));
+	std::memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = this->handler;
 	sa.sa_mask = this->evsigmask;
 	sa.sa_flags |= SA_RESTART;
@@ -249,24 +248,24 @@ int event_base::evsignal_deliver()
 void event_base::readsig_cb(event *argev)
 {
 	std::cout << __func__ << std::endl;
-	static char signals[100];
-	rw_event *ev = (rw_event *)argev;
-	int n = read(ev->fd, signals, sizeof(signals));
-	if (n == -1)
-	{
-		std::cout << __func__ << " err \n";
-		exit(-1);
-	}
-	ev->add();
+	// static char signals[100];
+	// rw_event *ev = (rw_event *)argev;
+	// int n = read(ev->fd, signals, sizeof(signals));
+	// if (n == -1)
+	// {
+	// 	std::cout << __func__ << " err \n";
+	// 	exit(-1);
+	// }
+	// ev->add();
 }
 
 void event_base::handler(int sig)
 {
 	std::cout << __func__ << std::endl;
-	evsigcaught[sig]++;
+	sigcaught[sig]++;
 	caught = 1;
 
-	write(ev_signal_pair[0], "a", 1);
+	// write(ev_signal_pair[0], "a", 1);
 }
 
 } // namespace eve

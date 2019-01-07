@@ -1,20 +1,24 @@
-#include "buffer.hh"
+#include <buffer.hh>
 #include <string>
+#include <cstring>
 #include <iostream>
 #include <unistd.h>
-#include <string.h>
 
 namespace eve
 {
+
+void buffer::reset()
+{
+    __drain(_off);
+}
 
 /*
  * Reads a line terminated by either '\r\n', '\n\r' or '\r' or '\n'.
  * The returned buffer needs to be freed by the called.
  */
-char *buffer::readline()
+std::string buffer::readline()
 {
-    unsigned char *data = _buf;
-    char *line;
+    char *data = (char *)_buf;
     unsigned int i;
 
     for (i = 0; i < _off; i++)
@@ -24,22 +28,20 @@ char *buffer::readline()
     }
 
     if (i == _off)
-        return nullptr; /* not found */
+        return ""; /* not found */
 
-    try
+    int onemore = 0;
+    if (i + 1 < _off) // check \r\n \n\r
     {
-        line = new char[i + 1];
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << e.what() << '\n';
-        __drain(i);
-        return nullptr;
+        if ((data[i] == '\r' && data[i + 1] == '\n') ||
+            data[i] == '\n' && data[i + 1] == '\r')
+            onemore++;
     }
 
-    memcpy(line, data, i);
-    line[i] = '\0';
-    __drain(i + 1);
+    data[i] = '\0';
+    data[i + onemore] = '\0';
+    std::string line(data);
+    __drain(i + onemore+1);
     return line;
 }
 
@@ -47,23 +49,30 @@ char *buffer::readline()
 int buffer::push_back(void *data, size_t datlen)
 {
     size_t need = _off + _misalign + datlen;
-    size_t oldoff = _off;
+    // size_t oldoff = _off;
 
     if (_totallen < need)
         if (__expand(datlen) == -1)
             return -1;
 
-    memcpy(_buf + _off, data, datlen);
+    std::memcpy(_buf + _off, data, datlen);
     _off += datlen;
 
     return 0;
 }
 
-int buffer::push_back_buffer(buffer *inbuf)
+int buffer::push_back_buffer(buffer *inbuf, size_t datlen)
 {
-    int res = push_back(inbuf->_buf, inbuf->_off);
+    if (!inbuf)
+        return 0;
+    int len = datlen;
+    if (len > inbuf->_off)
+        len = inbuf->_off;
+    if (datlen < 0)
+        len = _off;
+    int res = push_back(inbuf->_buf, len);
     if (res == 0)
-        inbuf->__drain(inbuf->_off);
+        inbuf->__drain(len);
 
     return res;
 }
@@ -73,7 +82,7 @@ size_t buffer::pop_front(void *data, size_t size)
 {
     if (_off < size)
         size = _off;
-    memcpy(data, _buf, size);
+    std::memcpy(data, _buf, size);
 
     if (size)
         __drain(size);
@@ -118,7 +127,7 @@ unsigned char *buffer::find(unsigned char *what, size_t len)
 
     while ((p = (unsigned char *)memchr(search, *what, remain)) != NULL && remain > len)
     {
-        if (memcmp(p, what, len) == 0)
+        if (std::memcmp(p, what, len) == 0)
             return (unsigned char *)p;
 
         search = p + 1;
@@ -127,7 +136,6 @@ unsigned char *buffer::find(unsigned char *what, size_t len)
 
     return NULL;
 }
-
 
 /** private function **/
 
@@ -186,7 +194,7 @@ int buffer::__expand(size_t datlen)
 
 void buffer::__align()
 {
-    memmove(_origin_buf, _buf, _off);
+    std::memmove(_origin_buf, _buf, _off);
     _buf = _origin_buf;
     _misalign = 0;
 }

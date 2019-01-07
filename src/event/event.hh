@@ -55,8 +55,8 @@ public:
 	inline void clear_persistent() { _persistent = false; }
 	inline bool is_persistent() const { return _persistent; }
 
-	virtual void add() = 0;
-	virtual void del() = 0;
+	virtual int add() = 0;
+	virtual int del() = 0;
 
 	void set_priority(int pri);
 	void activate(short ncalls);

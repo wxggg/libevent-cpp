@@ -126,7 +126,6 @@ static int usepersist;
 
 void multiple_write_cb(event *argev)
 {
-    // cout << __func__ << endl;
     rw_event *ev = (rw_event *)argev;
 
     int len = 128;
@@ -156,7 +155,6 @@ void multiple_write_cb(event *argev)
 
 void multiple_read_cb(event *argev)
 {
-    // cout << __func__ << endl;
     rw_event *ev = (rw_event *)argev;
 
     int len = read(ev->fd, rbuf + roff, sizeof(rbuf) - roff);
@@ -181,7 +179,9 @@ void test3(void)
 
     memset(rbuf, 0, sizeof(rbuf));
     for (int i = 0; i < sizeof(wbuf); i++)
-        wbuf[i] = i;
+    {
+        wbuf[i] = i%32+32;
+    }
 
     roff = woff = 0;
     usepersist = 0;
@@ -568,12 +568,11 @@ void test_priorities(int npriorities)
     cleanup_test();
 }
 
-
 int main(int argc, char const *argv[])
 {
-    // pbase = new epoll_base();
+    pbase = new epoll_base();
     // pbase = new select_base();
-    pbase = new poll_base();
+    // pbase = new poll_base();
 
     test1();
 
@@ -587,7 +586,7 @@ int main(int argc, char const *argv[])
 
     test6();
 
-    test7();
+    // test7();
 
     test8();
 
