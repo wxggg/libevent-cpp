@@ -98,7 +98,7 @@ class event_base
 
   private:
 	static void handler(int sig);
-	static void readsig_cb(event *argev);
+	static void readsig_cb();
 };
 
 } // namespace eve

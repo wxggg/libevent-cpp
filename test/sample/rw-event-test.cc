@@ -13,9 +13,8 @@
 using namespace std;
 using namespace eve;
 
-void fifo_read(event *argev)
+void fifo_read(rw_event *ev)
 {
-    rw_event *ev = (rw_event *)argev;
     char buf[255];
     int len = read(ev->fd, buf, sizeof(buf) - 1);
     if (len == -1)
@@ -32,9 +31,8 @@ void fifo_read(event *argev)
     cout << buf << endl;
 }
 
-void signal_int(event *argev)
+void signal_int(signal_event *ev)
 {
-    signal_event *ev  =(signal_event*) argev;
     cout<<"signal event "<<ev->sig<<" called back"<<endl;
     exit(-1);
 }
@@ -42,10 +40,9 @@ void signal_int(event *argev)
 int main(int argc, char const *argv[])
 {
     // select_base base;
-    poll_base base;
+    auto base = std::make_shared<epoll_base>();
     // epoll_base base;
 
-    rw_event evfifo(&base);
 
     const char *fifo = "/tmp/event.fifo";
 
@@ -65,14 +62,15 @@ int main(int argc, char const *argv[])
         exit(1);
     }
 
-    evfifo.set(socket, READ, fifo_read);
+    rw_event evfifo(base, socket, READ);
+    evfifo.set_callback(fifo_read, &evfifo);
     evfifo.add();
 
-    signal_event evsigint(&base);
-    evsigint.set(SIGINT, signal_int);
+    signal_event evsigint(base, SIGINT);
+    evsigint.set_callback(signal_int, &evsigint);
     // evsigint.add();
 
-    base.loop();
+    base->loop();
 
     return 0;
 }

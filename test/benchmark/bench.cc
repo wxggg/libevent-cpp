@@ -19,17 +19,15 @@ static int num_pipes, num_active, num_writes;
 static int *pipes;
 static vector<rw_event *> vecrw;
 
-event_base *pbase;
+std::shared_ptr<event_base> pbase;
 
-void read_cb(event *argev)
+void read_cb(int fd, int idx)
 {
-    // cout << __func__ << " called ";
-    rw_event *ev = (rw_event *)argev;
-    int idx = (size_t)ev->data, widx = idx + 1;
+    int widx = idx + 1;
     // cout << "idx=" << idx;
     u_char ch;
 
-    count += read(ev->fd, &ch, sizeof(ch));
+    count += read(fd, &ch, sizeof(ch));
     if (writes)
     {
         if (widx >= num_pipes)
@@ -50,9 +48,9 @@ run_once(void)
     {
         ev = vecrw[i];
         ev->del();
-        ev->set(cp[0], READ, read_cb);
+        ev->set_fd(cp[0]);
+        ev->set_callback(read_cb, ev->fd, i);
         ev->set_persistent();
-        ev->data = (void *)i;
         ev->add();
     }
     pbase->set_loop_nonblock_and_once();
@@ -71,7 +69,7 @@ run_once(void)
 
     static struct timeval ts, te;
     int xcount = 0;
-    gettimeofday(&ts, NULL);
+    gettimeofday(&ts, nullptr);
     pbase->set_loop_nonblock_and_once();
     do
     {
@@ -81,7 +79,7 @@ run_once(void)
              << endl;
     } while (count != fired);
     pbase->clear_loop_nonblock();
-    gettimeofday(&te, NULL);
+    gettimeofday(&te, nullptr);
 
     if (xcount != count)
         cerr << "Xcount:" << xcount << ", Rcount:" << count << endl;
@@ -133,7 +131,7 @@ int main(int argc, char *const argv[])
         exit(1);
     }
 
-    pbase = new epoll_base();
+    pbase = std::make_shared<epoll_base>();
     // pbase = new select_base(); // max file descriptor is limited
     // pbase = new poll_base();
     pbase->priority_init(1);
@@ -141,7 +139,7 @@ int main(int argc, char *const argv[])
     vecrw.resize(num_pipes);
     for (int i = 0; i < num_pipes; i++)
     {
-        vecrw[i] = new rw_event(pbase);
+        vecrw[i] = new rw_event(pbase, -1, READ);
     }
     pipes = new int[num_pipes * 2];
     cout << "memory alloc finished\n";

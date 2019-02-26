@@ -56,7 +56,7 @@ int select_base::dispatch(struct timeval *tv)
 
     //...
 
-    int res = select(event_fds + 1, event_readset_out, event_writeset_out, NULL, tv);
+    int res = select(event_fds + 1, event_readset_out, event_writeset_out, nullptr, tv);
 
     //...
 
@@ -166,11 +166,11 @@ repeat:
 		if (FD_ISSET(i,in) && check(SEL_IN,wait,current->files->fd[i])) {
 			FD_SET(i, res_in);
 			count++;
-			wait = NULL;
+			wait = nullptr;
 		}
 		//... out ex
 	}
-	wait = NULL;
+	wait = nullptr;
     // 如果没有io操作 且 没有超时 且 出现的信号不是非阻塞的
 	if (!count && current->timeout && !(current->signal & ~current->blocked)) {
 		schedule(); // 重新调度，主动释放cpu
@@ -193,7 +193,7 @@ repeat:
  * case it became ready just after the check and just before it called
  * select_wait, we call it again, knowing we are already on its
  * wait queue this time.  The second call is not necessary if the
- * select_table is NULL indicating an earlier file check was ready
+ * select_table is nullptr indicating an earlier file check was ready
  * and we aren't going to sleep on the select_table.  -- jrs
  */
 
@@ -206,7 +206,7 @@ static int check(int flag, select_table * wait, struct file * file)
 	inode = file->f_inode;
 	if ((fops = file->f_op) && (select = fops->select))
 		return select(inode, file, flag, wait)
-		    || (wait && select(inode, file, flag, NULL));
+		    || (wait && select(inode, file, flag, nullptr));
 	if (flag != SEL_EX)
 		return 1;
 	return 0;

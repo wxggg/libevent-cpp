@@ -4,45 +4,45 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <functional>
 
 namespace eve
 {
-
-typedef void (*handle_cb_t)(std::shared_ptr<http_request>);
+using HandleCallBack = std::function<void(std::shared_ptr<http_request>)>;
 
 class rw_event;
-class http_server
+class http_server : public std::enable_shared_from_this<http_server>
 {
-public:
-  event_base *base = NULL;
-  int timeout = -1;
-  void (*gencb)(std::shared_ptr<http_request>) = NULL;
+  public:
+	std::shared_ptr<event_base> base = nullptr;
+	int timeout = -1;
 
-  std::list<rw_event *> sockets;
-  // std::list<struct http_cb *> callbacks;
-  std::map<std::string, handle_cb_t> handle_callbacks;
-  std::list<std::shared_ptr<http_server_connection>> connections;
+	std::function<void(std::shared_ptr<http_request>)> gencb = nullptr;
 
-  std::string address;
-  int port;
+	std::list<rw_event *> sockets;
+	std::map<std::string, HandleCallBack> handle_callbacks;
+	std::list<std::shared_ptr<http_server_connection>> connections;
 
-public:
-  http_server(event_base *base) { this->base = base; }
-  ~http_server();
+	std::string address;
+	int port;
 
-  inline void set_handle_cb(std::string what, handle_cb_t cb)
-  {
-    handle_callbacks[what] = cb;
-  }
+  public:
+	http_server(std::shared_ptr<event_base> base) { this->base = base; }
+	~http_server();
 
-  inline void set_timeout(int sec) { timeout = sec; }
+	inline void set_handle_cb(std::string what, HandleCallBack cb)
+	{
+		handle_callbacks[what] = cb;
+	}
 
-  int start(const std::string &address, unsigned short port);
+	inline void set_timeout(int sec) { timeout = sec; }
 
-  void clean_connections();
-  void get_request(int fd, const std::string &host, int port);
+	int start(const std::string &address, unsigned short port);
 
-private:
+	void clean_connections();
+	void get_request(int fd, const std::string &host, int port);
+
+  private:
 };
 
 } // namespace eve

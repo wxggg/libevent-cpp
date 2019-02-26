@@ -35,9 +35,9 @@ struct epoll_event {
 static int __init eventpoll_init(void)
 {
     epi_cache = kmem_cache_create("eventpoll_epi", sizeof(struct epitem), 0,
-				      SLAB_HWCACHE_ALIGN | EPI_SLAB_DEBUG, NULL, NULL);
+				      SLAB_HWCACHE_ALIGN | EPI_SLAB_DEBUG, nullptr, nullptr);
 	pwq_cache = kmem_cache_create("eventpoll_pwq", sizeof(struct eppoll_entry), 0,
-				      EPI_SLAB_DEBUG, NULL, NULL);
+				      EPI_SLAB_DEBUG, nullptr, nullptr);
     error = register_filesystem(&eventpoll_fs_type);
 	eventpoll_mnt = kern_mount(&eventpoll_fs_type);
 }

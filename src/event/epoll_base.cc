@@ -104,6 +104,7 @@ int epoll_base::add(rw_event *ev)
 	// std::cout << "id=" << ev->id << "__add____________________op=" << op << " events=" << epev.events << std::endl;
 	if (epoll_ctl(_epfd, op, ev->fd, &epev) == -1)
 		return -1;
+	return 0;
 }
 
 int epoll_base::del(rw_event *ev)

@@ -22,10 +22,10 @@ class select_base : public event_base
 	select_base();
 	~select_base();
 
-	int add(rw_event *ev);
-	int del(rw_event *ev);
-	int recalc();
-	int dispatch(struct timeval *tv);
+	int add(rw_event *ev) override;
+	int del(rw_event *ev) override;
+	int recalc() override;
+	int dispatch(struct timeval *tv) override;
 
   private:
 	int resize(int fdsz);

@@ -4,7 +4,7 @@
 namespace eve
 {
 
-http_client::http_client(event_base *base)
+http_client::http_client(std::shared_ptr<event_base>base)
 {
     this->base = base;
 }
@@ -15,7 +15,7 @@ http_client::~http_client()
 
 int http_client::make_connection(const std::string &address, unsigned int port)
 {
-    std::shared_ptr<http_client_connection> conn(new http_client_connection(base, this));
+    auto conn = std::make_shared<http_client_connection>(base, shared_from_this());
     conn->servaddr = address;
     conn->servport = port;
 
@@ -33,7 +33,7 @@ int http_client::make_request(int connid, std::shared_ptr<http_request> req)
         return -1;
     }
 
-    std::shared_ptr<http_client_connection> conn = connections.at(connid);
+    auto conn = connections.at(connid);
 
     req->kind = REQUEST;
     req->conn = conn.get();
@@ -43,6 +43,8 @@ int http_client::make_request(int connid, std::shared_ptr<http_request> req)
 
     conn->requests.push(req);
     conn->dispatch();
+
+    return 0;
 }
 
 } // namespace eve

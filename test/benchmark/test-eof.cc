@@ -11,11 +11,10 @@ using namespace std;
 using namespace eve;
 
 int called = 0;
-void read_cb(event *argev)
+void read_cb(rw_event *ev)
 {
     cout << __func__ << " called\n";
     char buf[256];
-    rw_event *ev = (rw_event *)argev;
     int len = read(ev->fd, buf, sizeof(buf));
 
     cout << "read:" << buf << " len=" << len << endl;
@@ -27,9 +26,8 @@ void read_cb(event *argev)
 
 int main(int argc, char const *argv[])
 {
-    // epoll_base base;
-    poll_base base;
-    base.priority_init(1);
+    auto base = std::make_shared<poll_base>();
+    base->priority_init(1);
 
     char *test = "test string";
     int pair[2];
@@ -39,13 +37,14 @@ int main(int argc, char const *argv[])
     write(pair[0], test, strlen(test) + 1);
     shutdown(pair[0], SHUT_WR); // shutdown write
 
-    rw_event *ev = new rw_event(&base);
-    ev->set(pair[1], READ, read_cb);
+    rw_event ev(base, pair[1], READ);
+
+    ev.set_callback(read_cb, &ev);
     cout<<"pari1="<<pair[1]<<endl;
 
-    ev->add();
+    ev.add();
 
-    base.loop();
+    base->loop();
 
     return 0;
 }

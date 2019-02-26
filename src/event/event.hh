@@ -4,48 +4,59 @@
 #include <queue>
 #include <vector>
 #include <iostream>
+#include <functional>
+#include <memory>
+#include <future>
 
 #include <sys/time.h>
 #include <signal.h>
 
 namespace eve
 {
+class event;
+class event_base;
 
-enum ERR {
+using Callback = std::function<void()>;
+
+enum ERR
+{
 	E_EOF = -127,
 	E_TIMEOUT = -126,
 	E_UNKNOW,
 };
 
-class event_base;
-class event
+class event : public std::enable_shared_from_this<event>
 {
-private:
+  private:
 	static int _internal_event_id;
 	bool _persistent = false;
 	bool _active = false;
 
-public:
+  public:
 	int id;
-	event_base *base;
+	std::shared_ptr<event_base> base;
 	short ncalls = 0;
 	int pri; /* smaller numbers means higher priority */
 
-	void (*callback)(event *ev);
-	int res; /* result passed to event callback */
+	// EvCallback callback;
+	// int res; /* result passed to event callback */
+
+	// Callback *pcb;
+	std::unique_ptr<Callback> pcb;
 
 	short *ev_pncalls; /* allows deletes in callback */
 
 	void *data; /* can be used to store anything */
 
+	std::shared_ptr<void> ptr; /* used to store smart pointer */
+
 	int err = -1;
 
-public:
-	event(event_base *base);
+  public:
+	event(std::shared_ptr<event_base> base);
 	virtual ~event() {}
 
-	inline void set_base(event_base *base) { this->base = base; }
-	inline void set_callback(void (*callback)(event *)) { this->callback = callback; }
+	inline void set_base(std::shared_ptr<event_base> base) { this->base = base; }
 
 	inline void set_active() { _active = true; }
 	inline void clear_active() { _active = false; }
@@ -61,10 +72,16 @@ public:
 	void set_priority(int pri);
 	void activate(short ncalls);
 
-
 	static void default_callback(event *ev)
 	{
-		std::cerr<<"warning: event id="<<ev->id<<" called default callback\n";
+		std::cerr << "warning: event id=" << ev->id << " called default callback\n";
+	}
+
+	template <typename F, typename... Rest>
+	decltype(auto) set_callback(F &&f, Rest &&... rest)
+	{
+		auto tsk = std::bind(std::forward<F>(f), std::forward<Rest>(rest)...);
+		this->pcb = std::make_unique<Callback>([tsk]() { tsk(); });
 	}
 };
 

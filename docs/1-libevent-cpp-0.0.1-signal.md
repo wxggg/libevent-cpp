@@ -16,7 +16,7 @@ class event
 	short ev_ncalls;
 
 	int ev_pri; /* smaller numbers are higher priority */
-	event_base *ev_base;
+	std::shared_ptr<event_base>ev_base;
 	void (*ev_callback)(int, short, void *arg);
 
 	/** EVLIST_TIMEOUT EVLIST_INSERTED EVLIST_SIGNAL EVLIST_ACTIVE
@@ -106,7 +106,7 @@ void evsignal::callback(int fd, short what, void *arg)
 	{
 		exit(-1);
 	}
-	ev->ev_base->add_event(ev, NULL);
+	ev->ev_base->add_event(ev, nullptr);
 }
 
 void evsignal::handler(int sig)
@@ -137,7 +137,7 @@ int main(int argc, char const *argv[])
     eve::event signal_int;
     signal_int.set(&sel, SIGINT, EV_SIGNAL|EV_PERSIST, &signal_cb);
 
-    sel.add_event(&signal_int, NULL);
+    sel.add_event(&signal_int, nullptr);
 
     sel.loop(0);
 
@@ -184,7 +184,7 @@ select_base::select_base()
     evsig = new evsignal(this);
 }
 
-evsignal::evsignal(event_base *base)
+evsignal::evsignal(std::shared_ptr<event_base>base)
 {
 	std::cout << __func__ << std::endl;
 	sigemptyset(&evsigmask);
@@ -238,14 +238,14 @@ int evsignal::recalc()
 	if (!ev_signal_added)
 	{
 		ev_signal_added = 1;
-		this->ev_base->add_event(this->ev_signal, NULL);
+		this->ev_base->add_event(this->ev_signal, nullptr);
 	}
 
 	if (this->ev_base->signalqueue.empty() && !needrecalc)
 		return 0;
 	needrecalc = 0;
 
-	if (sigprocmask(SIG_BLOCK, &evsigmask, NULL) == -1)
+	if (sigprocmask(SIG_BLOCK, &evsigmask, nullptr) == -1)
 		return -1;
 
 	struct sigaction sa;
@@ -257,7 +257,7 @@ int evsignal::recalc()
 
 	for (auto ev : this->ev_base->signalqueue)
 	{
-		if (sigaction(ev->ev_fd, &sa, NULL) == -1)
+		if (sigaction(ev->ev_fd, &sa, nullptr) == -1)
 			return -1;
 	}
 	return 0;
@@ -311,7 +311,7 @@ int evsignal::deliver()
 	if (this->ev_base->signalqueue.empty())
 		return 0;
 
-	return sigprocmask(SIG_UNBLOCK, &this->evsigmask, NULL);
+	return sigprocmask(SIG_UNBLOCK, &this->evsigmask, nullptr);
 }
 ```
 #### 程序等待select函数及信号的发生
@@ -320,7 +320,7 @@ int evsignal::deliver()
 ```c++
 int select_base::dispatch(struct timeval *tv)
 {
-    int res = select(event_fds, &event_readset_out[0], &event_writeset_out[0], NULL, tv);
+    int res = select(event_fds, &event_readset_out[0], &event_writeset_out[0], nullptr, tv);
 
     if (evsig->recalc() == -1)
         return -1;
@@ -377,7 +377,7 @@ void evsignal::callback(int fd, short what, void *arg)
 	{
 		exit(-1);
 	}
-	ev->ev_base->add_event(ev, NULL);
+	ev->ev_base->add_event(ev, nullptr);
 }
 
 void evsignal::handler(int sig)

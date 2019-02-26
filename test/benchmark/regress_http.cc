@@ -12,7 +12,7 @@
 using namespace std;
 using namespace eve;
 
-event_base *base = nullptr;
+std::shared_ptr<event_base> base = nullptr;
 static int test_ok = 0;
 std::string host = "127.0.0.1";
 unsigned short port = 8102;
@@ -20,7 +20,7 @@ unsigned short port = 8102;
 void http_test_cb(std::shared_ptr<http_request> req)
 {
     cerr << __func__ << " called\n";
-    buffer *buf = new buffer();
+    std::shared_ptr<buffer> buf = std::make_shared<buffer>();
     buf->push_back_string("This is funny");
     const std::string &multi = req->input_headers["X-multi"];
     if (!multi.empty())
@@ -37,7 +37,6 @@ void http_test_cb(std::shared_ptr<http_request> req)
 
     /* allow sending of an empty reply */
     req->send_reply(HTTP_OK, "Everything is fine", req->input_headers["Empty"].empty() ? buf : nullptr);
-    delete buf;
 }
 
 static const string CHUNKS[] = {
@@ -52,20 +51,19 @@ struct chunk_req_state
 };
 
 static void
-http_chunked_trickle_cb(event *ev)
+http_chunked_trickle_cb(time_event *ev)
 {
     cerr << __func__ << " called!!\n";
-    time_event *tev = (time_event *)ev;
     struct chunk_req_state *state = (struct chunk_req_state *)ev->data;
 
-    buffer *buf = new buffer();
+    std::shared_ptr<buffer> buf = std::make_shared<buffer>();
     buf->push_back_string(CHUNKS[state->i]);
     state->req->send_reply_chunk(buf);
 
-    if (++state->i < sizeof(CHUNKS) / sizeof(CHUNKS[0]))
+    if (++state->i < static_cast<int>(sizeof(CHUNKS) / sizeof(CHUNKS[0])))
     {
-        tev->set_timer(0, 0);
-        tev->add();
+        ev->set_timer(0, 0);
+        ev->add();
     }
     else
     {
@@ -86,7 +84,7 @@ void http_chunked_cb(std::shared_ptr<http_request> req)
 
     time_event *tev = new time_event(base);
     tev->set_timer(0, 0);
-    tev->set_callback(http_chunked_trickle_cb);
+    tev->set_callback(http_chunked_trickle_cb, tev);
     tev->data = (void *)state;
     tev->add();
 }
@@ -103,21 +101,17 @@ void http_post_cb(std::shared_ptr<http_request> req)
 
     cout << "get data::" << req->input_buffer->get_data() << endl;
 
-    buffer *buf = new buffer();
+    std::shared_ptr<buffer> buf = std::make_shared<buffer>();
     buf->push_back_string("This is funny");
 
     req->send_reply(HTTP_OK, "Everything is find", buf);
-    delete buf;
 }
 
 http_client_connection *delayed_conn;
-static void http_delay_reply(event *argev)
+static void http_delay_reply(time_event *ev, shared_ptr<http_request> req)
 {
     cerr << __func__ << " called" << endl;
-    time_event *tev = (time_event *)argev;
-    http_request *req = (http_request *)tev->data;
-
-    req->send_reply(HTTP_OK, "Everything is fine", NULL);
+    req->send_reply(HTTP_OK, "Everything is fine", nullptr);
 
     delayed_conn->fail(HTTP_EOF);
 }
@@ -127,22 +121,20 @@ void http_large_delay_cb(std::shared_ptr<http_request> req)
     cerr << __func__ << " called!!!\n";
     time_event *tev = new time_event(base);
     tev->set_timer(6, 0);
-    tev->data = (void *)req.get();
-    tev->set_callback(http_delay_reply);
+    tev->set_callback(http_delay_reply, tev, req);
     tev->add();
 }
 
 void http_dispatcher_cb(std::shared_ptr<http_request> req)
 {
     cerr << __func__ << " called!!!\n";
-    buffer *buf = new buffer();
+    std::shared_ptr<buffer> buf = std::make_shared<buffer>();
     buf->push_back_string("dispatcher-test");
 
     req->send_reply(HTTP_OK, "Everything is find", buf);
-    delete buf;
 }
 
-static shared_ptr<http_server> http_setup(event_base *base)
+static shared_ptr<http_server> http_setup(std::shared_ptr<event_base> base)
 {
     cout << __func__ << endl;
     shared_ptr<http_server> server(new http_server(base));
@@ -160,10 +152,10 @@ static shared_ptr<http_server> http_setup(event_base *base)
 static void http_readcb(buffer_event *bev)
 {
     cout << __func__ << endl;
-    if (bev->input_buffer->find_string("This is funny") != NULL)
+    if (bev->input_buffer->find_string("This is funny") != nullptr)
     {
         std::shared_ptr<http_request> req(new http_request());
-        enum message_read_status done;
+        // enum message_read_status done;
 
         req->kind = RESPONSE;
         req->parse_firstline(bev->input_buffer);
@@ -172,6 +164,10 @@ static void http_readcb(buffer_event *bev)
             cout << p.first << "\t===\t" << p.second << endl;
         bev->del_read();
         base->set_terminated(true);
+    }
+    else
+    {
+        cout << "not found\n";
     }
 }
 
@@ -200,10 +196,7 @@ static void http_basic_test(void)
 
     int fd = http_connect(host, port);
 
-    buffer_event *bev = new buffer_event(base);
-    bev->set_fd(fd);
-    bev->set_read();
-    bev->set_write();
+    buffer_event *bev = new buffer_event(base, fd, RDWR);
     bev->set_cb(http_readcb, http_writecb, http_errcb);
 
     bev->write_string("GET /test HTTP/1.1\r\nHost: some");
@@ -231,7 +224,7 @@ static void http_request_done(std::shared_ptr<http_request> req)
         exit(1);
     }
 
-    if (req->input_buffer->get_length() != what.length())
+    if (req->input_buffer->get_length() != static_cast<int>(what.length()))
     {
         cerr << "3 FAILED\n";
         exit(1);
@@ -273,7 +266,7 @@ static void http_connection_test(int persistent)
     base->loop();
 }
 
-static void close_detect_end(event *argev)
+static void close_detect_end()
 {
     cout << __func__ << endl;
     base->set_terminated(true);
@@ -283,7 +276,7 @@ static void close_detect_done(std::shared_ptr<http_request> req)
 {
     cout << __func__ << endl;
     // cout<<"code="<<req->response_code<<endl;
-    if (req == NULL || req->response_code != HTTP_OK)
+    if (req == nullptr || req->response_code != HTTP_OK)
     {
         cerr << "FAILED\n";
         exit(1);
@@ -295,10 +288,9 @@ static void close_detect_done(std::shared_ptr<http_request> req)
     tev->add();
 }
 
-static void close_detect_launch(event *argev)
+static void close_detect_launch()
 {
     cout << __func__ << endl;
-    time_event *tev = (time_event *)argev;
 
     std::shared_ptr<http_request> req(new http_request());
     req->output_headers["Host"] = "somehost";
@@ -312,7 +304,7 @@ static void close_detect_launch(event *argev)
 static void close_detect_cb(std::shared_ptr<http_request> req)
 {
     cout << __func__ << endl;
-    if (req != NULL && req->response_code != HTTP_OK)
+    if (req != nullptr && req->response_code != HTTP_OK)
     {
         cerr << "FAILEd\n";
         exit(1);
@@ -368,7 +360,7 @@ static void http_postrequest_done(shared_ptr<http_request> req)
         exit(1);
     }
 
-    if (req->input_buffer->get_length() != what.size())
+    if (req->input_buffer->get_length() != static_cast<int>(what.size()))
     {
         cerr << "Faild length\n";
         exit(1);
@@ -402,7 +394,7 @@ static void http_failure_readcb(buffer_event *bev)
 {
     cout << __func__ << " called\n";
     const string what = "400 Bad Request";
-    if (bev->input_buffer->find_string(what) != NULL)
+    if (bev->input_buffer->find_string(what) != nullptr)
     {
         bev->del_read();
         base->set_terminated(true);
@@ -416,10 +408,7 @@ static void http_failure_test(void)
 
     int fd = http_connect(host, port);
 
-    buffer_event *bev = new buffer_event(base);
-    bev->set_fd(fd);
-    bev->set_read();
-    bev->set_write();
+    buffer_event *bev = new buffer_event(base, fd, RDWR);
     bev->set_cb(http_failure_readcb, http_writecb, http_errcb);
 
     bev->write_string("illegal request\r\n");
@@ -446,7 +435,7 @@ static void http_dispatcher_test_done(shared_ptr<http_request> req)
         exit(1);
     }
 
-    if (req->input_buffer->get_length() != what.length())
+    if (req->input_buffer->get_length() != static_cast<int>(what.length()))
     {
         cerr << "Failed length\n";
         exit(1);
@@ -533,7 +522,7 @@ static void http_chunked_readcb(buffer_event *bev)
 {
     cout << __func__ << " called\n";
 
-    if (bev->input_buffer->find_string("bwv 1052") != NULL)
+    if (bev->input_buffer->find_string("bwv 1052") != nullptr)
     {
         base->set_terminated(true);
     }
@@ -561,10 +550,7 @@ static void http_chunked_test(void)
 
     int fd = http_connect(host, port);
 
-    buffer_event *bev = new buffer_event(base);
-    bev->set_fd(fd);
-    bev->set_read();
-    bev->set_write();
+    buffer_event *bev = new buffer_event(base, fd, RDWR);
     bev->set_cb(http_chunked_readcb, http_chunked_writecb, http_chunked_errorcb);
 
     const string http_request =
@@ -581,11 +567,11 @@ static void http_chunked_test(void)
 
 static void request_chunked_done(shared_ptr<http_request> req)
 {
-    cout<<__func__<<" called\n";
-    if (req->input_buffer->find_string(CHUNKS[2]) != NULL) {
+    cout << __func__ << " called\n";
+    if (req->input_buffer->find_string(CHUNKS[2]) != nullptr)
+    {
         base->set_terminated(true);
     }
-
 }
 
 static void http_chunked_handle_test(void)
@@ -609,7 +595,7 @@ static void http_chunked_handle_test(void)
 
 int main(int argc, char const *argv[])
 {
-    base = new epoll_base();
+    base = std::make_shared<epoll_base>();
     // base = new poll_base();
 
     http_basic_test();
@@ -633,8 +619,6 @@ int main(int argc, char const *argv[])
     http_chunked_test();
     http_chunked_handle_test();
 
-    std::cout<<"succeed\n";
-
-    delete base;
+    std::cout << "succeed\n";
     return 0;
 }

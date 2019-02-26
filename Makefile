@@ -10,15 +10,15 @@ SRC_PATH = src
 # Space-separated pkg-config libraries used by this project
 LIBS =
 # General compiler flags
-COMPILE_FLAGS = -std=c++14 -Wall -Wextra -fPIC -g 
+COMPILE_FLAGS = -std=c++14 -Wall -Wextra -fPIC -g
 # Additional release-specific flags
 RCOMPILE_FLAGS = -D NDEBUG
 # Additional debug-specific flags
 DCOMPILE_FLAGS = -D DEBUG
 # Add additional include paths
-INCLUDES = -Isrc/event -Isrc/http -Isrc/util
+INCLUDES = -Isrc/event -Isrc/http -Isrc/util -Isrc/thread
 # General linker settings
-LINK_FLAGS = -shared -fPIC -ldl
+LINK_FLAGS = -shared -fPIC -ldl -pthread
 # Additional release-specific linker settings
 RLINK_FLAGS =
 # Additional debug-specific linker settings
@@ -123,7 +123,7 @@ endif
 # Comment/remove this section to remove versioning
 USE_VERSION := false
 # If this isn't a git repo or the repo has no tags, git describe will return non-zero
-ifeq ($(shell git describe > /dev/null 2>&1 ; echo $$?), 0)
+ifeq ($(shell git describe > /dev/nullptr 2>&1 ; echo $$?), 0)
 	USE_VERSION := true
 	VERSION := $(shell git describe --tags --long --dirty --always | \
 		sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)-\?.*-\([0-9]*\)-\(.*\)/\1 \2 \3 \4 \5/g')

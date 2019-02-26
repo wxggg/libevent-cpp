@@ -7,6 +7,7 @@
 #include <cstring>
 #include <map>
 #include <memory>
+#include <functional>
 
 namespace eve
 {
@@ -44,10 +45,10 @@ class http_connection;
 class http_request
 {
   public:
-    buffer *input_buffer = NULL;
-    buffer *output_buffer = NULL;
+    std::shared_ptr<buffer> input_buffer = nullptr;
+    std::shared_ptr<buffer> output_buffer = nullptr;
     /* the connection object that this request belongs to */
-    http_connection *conn = NULL;
+    http_connection *conn = nullptr;
     int flags;
 #define REQ_OWN_CONNECTION 0x0001
 #define PROXY_REQUEST 0x0002
@@ -70,7 +71,8 @@ class http_request
     long ntoread;
     int chunked = 0;
 
-    void (*cb)(std::shared_ptr<http_request>) = NULL;
+    // void (*cb)(std::shared_ptr<http_request>) = nullptr;
+    std::function<void (std::shared_ptr<http_request>)> cb = nullptr;
     // void (*chunk_cb)(std::shared_ptr<http_request>);
 
     std::map<std::string, std::string> input_headers;
@@ -128,22 +130,22 @@ class http_request
 
     int get_body_length();
 
-    enum message_read_status parse_firstline(buffer *buf);
-    enum message_read_status parse_headers(buffer *buf);
-    enum message_read_status handle_chunked_read(buffer *buf);
+    enum message_read_status parse_firstline(std::shared_ptr<buffer> buf);
+    enum message_read_status parse_headers(std::shared_ptr<buffer> buf);
+    enum message_read_status handle_chunked_read(std::shared_ptr<buffer> buf);
 
     void send_error(int error, std::string reason);
     void send_not_found();
-    void send_page(buffer *buf);
-    void send_reply(int code, const std::string &reason, buffer *buf);
+    void send_page(std::shared_ptr<buffer> buf);
+    void send_reply(int code, const std::string &reason, std::shared_ptr<buffer> buf);
     void send_reply_start(int code, const std::string &reason);
-    void send_reply_chunk(buffer *buf);
+    void send_reply_chunk(std::shared_ptr<buffer> buf);
     void send_reply_end();
 
     void make_header();
 
   private:
-    void __send(buffer *databuf);
+    void __send(std::shared_ptr<buffer> databuf);
 
     int __parse_request_line(std::string line);
     int __parse_response_line(std::string line);

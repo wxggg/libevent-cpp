@@ -59,7 +59,7 @@ static struct addrinfo *__getaddrinfo(const std::string &address, unsigned short
     std::memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE; /* turn NULL host name into INADDR_ANY */
+    hints.ai_flags = AI_PASSIVE; /* turn nullptr host name into INADDR_ANY */
 
     int ai_result = getaddrinfo(address.c_str(), strport.c_str(), &hints, &aitop);
 
@@ -80,7 +80,7 @@ int bind_socket(const std::string &address, unsigned short port, int reuse)
     int on;
 
     if (address.empty() && port == 0)
-        aitop = NULL, reuse = 0; /* just create an unbound socket */
+        aitop = nullptr, reuse = 0; /* just create an unbound socket */
     else
     {
         aitop = __getaddrinfo(address, port);

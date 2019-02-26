@@ -15,19 +15,20 @@ namespace eve
 
 int event::_internal_event_id = 0;
 
-event::event(event_base *base)
+event::event(std::shared_ptr<event_base> base)
 {
 	this->base = base;
 	this->pri = this->base->activequeues.size() / 2;
 	id = _internal_event_id++;
-	this->callback = default_callback;
+
+	set_callback(default_callback, this);
 }
 
 void event::set_priority(int pri)
 {
 	if (is_active())
 		return;
-	if (pri < 0 || pri >= this->base->activequeues.size())
+	if (pri < 0 || pri >= static_cast<int>(this->base->activequeues.size()))
 		return;
 	this->pri = pri;
 }

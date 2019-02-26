@@ -5,30 +5,24 @@
 namespace eve
 {
 
-static void read_timeout_cb(event *argev)
+static void read_timeout_cb(http_server_connection *conn)
 {
     std::cout << __func__ << " called\n";
-    time_event *read_timer = (time_event *)argev;
-    http_server_connection *conn = (http_server_connection *)read_timer->data;
     conn->fail(HTTP_TIMEOUT);
 }
 
-static void write_timeout_cb(event *argev)
+static void write_timeout_cb(http_server_connection *conn)
 {
     std::cout << __func__ << " called\n";
-    time_event *write_timer = (time_event *)argev;
-    http_server_connection *conn = (http_server_connection *)write_timer->data;
     conn->fail(HTTP_TIMEOUT);
 }
 
-http_server_connection::http_server_connection(event_base *base, http_server *server)
+http_server_connection::http_server_connection(std::shared_ptr<event_base> base, std::shared_ptr<http_server> server)
     : http_connection(base)
 {
     this->server = server;
-    read_timer->set_callback(read_timeout_cb);
-    read_timer->data = (void *)this;
-    write_timer->set_callback(write_timeout_cb);
-    write_timer->data = (void *)this;
+    read_timer->set_callback(read_timeout_cb, this);
+    write_timer->set_callback(write_timeout_cb, this);
 
     this->timeout = server->timeout;
     this->type = SERVER_CONNECTION;
@@ -40,7 +34,7 @@ http_server_connection::~http_server_connection()
 
 void http_server_connection::fail(http_connection_error error)
 {
-    std::shared_ptr<http_request> req = requests.front();
+    auto req = requests.front();
     std::cerr << "[FAIL] " << __func__ << " req->uri=" << req->uri << " with error=" << error << std::endl;
 
     /* 
@@ -74,7 +68,7 @@ void http_server_connection::fail(http_connection_error error)
          * been send, the connection should get freed.
          */
         if (req->cb)
-            (*req->cb)(req);
+            req->cb(req);
         handle_request(req);
         break;
     }
@@ -85,7 +79,7 @@ void http_server_connection::do_read_done()
     if (is_closed())
         return;
     del_read();
-    std::shared_ptr<http_request> req = requests.front();
+    auto req = requests.front();
     if (req->handled)
     {
         fail(HTTP_EOF);
@@ -102,7 +96,7 @@ int http_server_connection::associate_new_request()
 {
     if (is_closed())
         return -1;
-    std::shared_ptr<http_request> req(new http_request());
+    auto req = std::make_shared<http_request>();
     req->conn = this;
     req->flags |= REQ_OWN_CONNECTION;
 
@@ -134,14 +128,14 @@ void http_server_connection::handle_request(std::shared_ptr<http_request> req)
 
     if (server->handle_callbacks.count(realuri) > 0)
     {
-        (*server->handle_callbacks.at(realuri))(req);
+        server->handle_callbacks.at(realuri)(req);
         return;
     }
 
     /* generic callback */
     if (server->gencb)
     {
-        (*server->gencb)(req);
+        server->gencb(req);
         return;
     }
     else
@@ -152,7 +146,7 @@ void http_server_connection::do_write_over()
 {
     if (is_closed())
         return;
-    std::shared_ptr<http_request> req = requests.front();
+    auto req = requests.front();
     if (req->chunked == 1)
         return;
     requests.pop();

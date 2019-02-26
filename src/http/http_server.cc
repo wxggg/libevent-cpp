@@ -16,9 +16,8 @@ http_server::~http_server()
     }
 }
 
-static void __listen_cb(event *argev)
+static void __listen_cb(rw_event *ev)
 {
-    rw_event *ev = (rw_event *)argev;
     http_server *server = (http_server *)ev->data;
 
     std::string host;
@@ -42,7 +41,9 @@ int http_server::start(const std::string &address, unsigned short port)
     /* use a read event to listen on the fd */
     rw_event *ev = new rw_event(base);
     ev->data = (void *)this;
-    ev->set(fd, READ, __listen_cb);
+    ev->set_callback(__listen_cb, ev);
+    ev->set_fd(fd);
+    ev->set_read();
     ev->set_persistent();
     if (ev->add() == -1)
         return -1;
@@ -62,7 +63,7 @@ void http_server::clean_connections()
 
 void http_server::get_request(int fd, const std::string &host, int port)
 {
-    std::shared_ptr<http_server_connection> conn(new http_server_connection(this->base, this));
+    auto conn = std::make_shared<http_server_connection>(base, shared_from_this());
     conn->fd = fd;
     conn->clientaddress = host;
     conn->clientport = port;

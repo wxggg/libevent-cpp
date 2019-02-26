@@ -7,7 +7,7 @@
 namespace eve
 {
 
-time_event::time_event(event_base *base)
+time_event::time_event(std::shared_ptr<event_base>base)
     : event(base)
 {
     timerclear(&timeout);
@@ -21,7 +21,7 @@ time_event::~time_event()
 void time_event::set_timer(int sec, int usec)
 {
     struct timeval now, tv;
-    gettimeofday(&now, NULL);
+    gettimeofday(&now, nullptr);
 
     timerclear(&tv);
     tv.tv_sec = sec;

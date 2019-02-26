@@ -3,20 +3,13 @@
 namespace eve
 {
 
-buffer_event::buffer_event(event_base *base)
-    : rw_event(base)
+void buffer_event::init()
 {
-    this->callback = buffer_event_cb;
+    set_callback(buffer_event_cb, this);
     this->readcb = this->writecb = this->errorcb = default_cb;
 
-    this->input_buffer = new buffer();
-    this->output_buffer = new buffer();
-}
-
-buffer_event::~buffer_event()
-{
-    delete input_buffer;
-    delete output_buffer;
+    input_buffer = std::make_shared<buffer>();
+    output_buffer = std::make_shared<buffer>();
 }
 
 size_t buffer_event::write(void *data, size_t size)
@@ -38,10 +31,10 @@ size_t buffer_event::read(void *data, size_t size)
     return input_buffer->pop_front(data, size);
 }
 
-void buffer_event::buffer_event_cb(event *argev)
+void buffer_event::buffer_event_cb(buffer_event *ev)
 {
     // std::cout << __PRETTY_FUNCTION__ << " called\n";
-    buffer_event *ev = (buffer_event *)argev;
+    // buffer_event *ev = (buffer_event *)argev;
     int res = 0;
 
     if (ev->is_read_active())
@@ -50,11 +43,11 @@ void buffer_event::buffer_event_cb(event *argev)
         if (res > 0)
         {
             ev->add_read();
-            (*ev->readcb)(ev);
+            ev->readcb(ev);
         }
         else
         {
-            (*ev->errorcb)(ev);
+            ev->errorcb(ev);
             if (res == 0)
                 ev->err = EOF;
             if (res == -1)
@@ -72,11 +65,11 @@ void buffer_event::buffer_event_cb(event *argev)
         if (res > 0)
         {
             ev->add_write();
-            (*ev->writecb)(ev);
+            ev->writecb(ev);
         }
         else
         {
-            (*ev->errorcb)(ev);
+            ev->errorcb(ev);
             if (res == 0)
                 ev->err = EOF;
             if (res == -1)

@@ -4,7 +4,6 @@
 #include <time_event.hh>
 #include <util_network.hh>
 
-
 #include <string>
 #include <cstring>
 #include <iostream>
@@ -30,16 +29,16 @@ event_base::event_base()
 	signal_pair = get_fdpair();
 	sigcaught.resize(NSIG);
 
-	readsig = new rw_event(this);
-	readsig->set(signal_pair.second, READ, readsig_cb);
+	// readsig = new rw_event(this);
+	// readsig->set(signal_pair.second, READ, readsig_cb);
 	// readsig->add();
 }
 
 int event_base::priority_init(int npriorities)
 {
-	if (npriorities == activequeues.size() || npriorities < 1)
+	if (npriorities == static_cast<int>(activequeues.size()) || npriorities < 1)
 		return 0;
-	if (!activequeues.empty() && npriorities != activequeues.size())
+	if (!activequeues.empty() && npriorities != static_cast<int>(activequeues.size()))
 	{
 		for (auto item : activequeues)
 			item.clear();
@@ -60,7 +59,8 @@ int event_base::loop()
 	static int i = 0;
 	while (!done && i++ < 1000)
 	{
-		std::cout <<"\n[event]"<< " loop" << i << std::endl;
+		std::cout << "\n[event]"
+				  << " loop" << i << std::endl;
 		/* Terminate the loop if we have been asked to */
 		if (this->_terminated)
 		{
@@ -70,7 +70,7 @@ int event_base::loop()
 		}
 
 		int nactive_events = count_active_events();
-	
+
 		/* If we have no events, we just exit */
 		if (signalqueue.empty() && timeevset.empty() && !count_rw_events() && !nactive_events)
 		{
@@ -84,20 +84,20 @@ int event_base::loop()
 
 		int res;
 		struct timeval off;
-		struct timeval *tv = nullptr;
+		// struct timeval *tv = nullptr;
 		if (_loop_nonblock) // non block
 		{
 			timerclear(&off);
 			res = this->dispatch(&off);
 		}
-		else if(!nactive_events)
+		else if (!nactive_events)
 		{
 			if (timeevset.empty()) // no time event
-				res = this->dispatch(NULL);
+				res = this->dispatch(nullptr);
 			else // has time event
 			{
 				struct timeval now;
-				gettimeofday(&now, NULL);
+				gettimeofday(&now, nullptr);
 				time_event *timeev = *timeevset.begin();
 				if (timercmp(&(timeev->timeout), &now, >)) // no time event time out
 				{
@@ -138,13 +138,13 @@ int event_base::loop()
 void event_base::timeout_process()
 {
 	struct timeval now;
-	gettimeofday(&now, NULL);
+	gettimeofday(&now, nullptr);
 
 	time_event *ev;
 	std::set<time_event *, cmp_timeev>::iterator i = timeevset.begin();
 	while (i != timeevset.end())
 	{
-		
+
 		ev = *i;
 		if (timercmp(&ev->timeout, &now, >))
 			break;
@@ -159,7 +159,7 @@ void event_base::event_process_active()
 		return;
 
 	std::list<event *> &activeq = this->activequeues[0];
-	int i=0;
+	int i = 0;
 	for (auto &item : this->activequeues)
 	{
 		if (!item.empty())
@@ -179,7 +179,8 @@ void event_base::event_process_active()
 			while (ev->ncalls)
 			{
 				ev->ncalls--;
-				(*ev->callback)(ev);
+				// ev->callback(ev);
+				(*ev->pcb)();
 			}
 			i = activeq.erase(i);
 			ev->clear_active();
@@ -215,7 +216,7 @@ int event_base::evsignal_recalc()
 	if (signalqueue.empty() && !needrecalc)
 		return 0;
 	needrecalc = 0;
-	if (sigprocmask(SIG_BLOCK, &evsigmask, NULL) == -1)
+	if (sigprocmask(SIG_BLOCK, &evsigmask, nullptr) == -1)
 		return -1;
 
 	struct sigaction sa;
@@ -232,7 +233,7 @@ int event_base::evsignal_recalc()
 			std::cout << "error sig not set\n";
 			exit(-1);
 		}
-		if (sigaction(ev->sig, &sa, NULL) == -1)
+		if (sigaction(ev->sig, &sa, nullptr) == -1)
 			return -1;
 	}
 	return 0;
@@ -242,10 +243,10 @@ int event_base::evsignal_deliver()
 {
 	if (signalqueue.empty())
 		return 0;
-	return sigprocmask(SIG_UNBLOCK, &evsigmask, NULL);
+	return sigprocmask(SIG_UNBLOCK, &evsigmask, nullptr);
 }
 
-void event_base::readsig_cb(event *argev)
+void event_base::readsig_cb()
 {
 	std::cout << __func__ << std::endl;
 	// static char signals[100];

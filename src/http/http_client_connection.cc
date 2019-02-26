@@ -8,19 +8,17 @@
 namespace eve
 {
 
-static void read_timeout_cb(event *argev)
+static void read_timeout_cb()
 {
-    time_event *read_timer = (time_event *)argev;
     // conn->fail(HTTP_TIMEOUT);
 }
 
-static void write_timeout_cb(event *argev)
+static void write_timeout_cb()
 {
-    time_event *write_timer = (time_event *)argev;
     // conn->fail(HTTP_TIMEOUT);
 }
 
-http_client_connection::http_client_connection(event_base *base, http_client *client)
+http_client_connection::http_client_connection(std::shared_ptr<event_base> base, std::shared_ptr<http_client> client)
     : http_connection(base)
 {
     this->client = client;
@@ -39,7 +37,7 @@ http_client_connection::~http_client_connection()
 
 void http_client_connection::fail(http_connection_error error)
 {
-    std::shared_ptr<http_request> req = requests.front();
+    auto req = requests.front();
     std::cerr << "[FAIL] " << __func__ << " req->uri=" << req->uri << " with error=" << error << std::endl;
 
     this->requests.pop();
@@ -53,7 +51,7 @@ void http_client_connection::fail(http_connection_error error)
         this->connect();
 
     if (req->cb)
-        (*req->cb)(nullptr);
+        req->cb(nullptr);
 }
 
 void http_client_connection::do_read_done()
@@ -62,11 +60,11 @@ void http_client_connection::do_read_done()
     if (requests.empty())
         return;
 
-    std::shared_ptr<http_request> req = requests.front();
+    auto req = requests.front();
     requests.pop();
 
     if (req->cb)
-        (*req->cb)(req);
+        req->cb(req);
 
     return;
 }
@@ -94,7 +92,7 @@ void http_client_connection::do_write_over()
     this->add_read();
     state = READING_FIRSTLINE;
 
-    std::shared_ptr<http_request> req = requests.front();
+    auto req = requests.front();
     req->kind = RESPONSE;
 }
 
@@ -109,7 +107,7 @@ void http_client_connection::dispatch()
             return;
     }
 
-    std::shared_ptr<http_request> req = requests.front();
+    auto req = requests.front();
 
     assert(state == IDLE);
 
@@ -138,6 +136,7 @@ int http_client_connection::connect()
     }
     add();
     state = CONNECTING;
+    return 0;
 }
 
 } // namespace eve

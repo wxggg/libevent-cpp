@@ -182,20 +182,20 @@ static int do_poll(unsigned int nfds, struct pollfd *fds, poll_table *wait)
 
 			mask = POLLNVAL;
 			i = fdpnt->fd;
-			if (i < NR_OPEN && (file = fd[i]) != NULL) {
+			if (i < NR_OPEN && (file = fd[i]) != nullptr) {
 				mask = DEFAULT_POLLMASK;
 				if (file->f_op && file->f_op->poll)
 					mask = file->f_op->poll(file, wait); //调用底层驱动的poll
 				mask &= fdpnt->events | POLLERR | POLLHUP;
 			}
 			if (mask) { // mask非0，代表某些事件发生了
-				wait = NULL;
+				wait = nullptr;
 				count++;
 			}
 			fdpnt->revents = mask;
 		}
 
-		wait = NULL;
+		wait = nullptr;
         // 如果发生了某些读写等事件 或 已经超时 或 出现了非阻塞的信号 则跳出循环
 		if (count || !current->timeout || (current->signal & ~current->blocked))
 			break;
@@ -254,12 +254,12 @@ static int do_select(int n, fd_set_buffer *fds)
 				if ((mask & POLLIN_SET) && ISSET(bit, __IN(in))) {
 					SET(bit, __RES_IN(in));
 					retval++;
-					wait = NULL;
+					wait = nullptr;
 				}
                 // ... out ex
 			}
 		}
-		wait = NULL;
+		wait = nullptr;
 		if (retval || !current->timeout || (current->signal & ~current->blocked))
 			break;
 		schedule();
@@ -305,7 +305,7 @@ void poll_wait(struct wait_queue ** wait_address, poll_table * p)
  	entry = p->entry + p->nr;
 	entry->wait_address = wait_address;
 	entry->wait.task = current;
-	entry->wait.next = NULL;
+	entry->wait.next = nullptr;
 	add_wait_queue(wait_address,&entry->wait);
 	p->nr++;
 }

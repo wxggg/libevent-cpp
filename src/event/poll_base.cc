@@ -15,13 +15,12 @@ int poll_base::recalc()
 void poll_base::poll_check()
 {
     rw_event *ev = nullptr;
-    struct pollfd *pfd;
     int fd = -1;
     for (auto kv : fd_map_poll)
     {
         fd = kv.first;
         assert(fd > 0);
-        pfd = kv.second;
+        struct pollfd *pfd = kv.second;
         assert(pfd);
         assert(fd == pfd->fd);
         ev = fd_map_rw[fd];

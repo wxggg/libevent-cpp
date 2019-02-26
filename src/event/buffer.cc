@@ -34,7 +34,7 @@ std::string buffer::readline()
     if (i + 1 < _off) // check \r\n \n\r
     {
         if ((data[i] == '\r' && data[i + 1] == '\n') ||
-            data[i] == '\n' && data[i + 1] == '\r')
+            (data[i] == '\n' && data[i + 1] == '\r'))
             onemore++;
     }
 
@@ -61,19 +61,22 @@ int buffer::push_back(void *data, size_t datlen)
     return 0;
 }
 
-int buffer::push_back_buffer(buffer *inbuf, size_t datlen)
+int buffer::push_back_buffer(std::shared_ptr<buffer> inbuf, int datlen)
 {
     if (!inbuf)
         return 0;
+    std::cout<<inbuf->get_data()<<'\n';
+    std::cout<<"???"<<"datlen="<<datlen;
+    std::cout<<get_data()<<std::endl;
     int len = datlen;
-    if (len > inbuf->_off)
+    if (len > static_cast<int>(inbuf->_off) || datlen < 0)
         len = inbuf->_off;
-    if (datlen < 0)
-        len = _off;
     int res = push_back(inbuf->_buf, len);
     if (res == 0)
         inbuf->__drain(len);
 
+    std::cout<<"-----\n";
+    std::cout<<get_data()<<std::endl;
     return res;
 }
 
@@ -92,7 +95,6 @@ size_t buffer::pop_front(void *data, size_t size)
 /* Reads data from a file descriptor into a buffer. */
 int buffer::readfd(int fd, int howmuch)
 {
-    size_t oldoff = _off;
     int n = BUFFER_MAX_READ;
 
     if (howmuch < 0 || howmuch > n)
@@ -125,7 +127,7 @@ unsigned char *buffer::find(unsigned char *what, size_t len)
     auto search = _buf;
     unsigned char *p;
 
-    while ((p = (unsigned char *)memchr(search, *what, remain)) != NULL && remain > len)
+    while ((p = (unsigned char *)memchr(search, *what, remain)) != nullptr && remain > len)
     {
         if (std::memcmp(p, what, len) == 0)
             return (unsigned char *)p;
@@ -134,7 +136,7 @@ unsigned char *buffer::find(unsigned char *what, size_t len)
         remain = _off - (size_t)(search - _buf);
     }
 
-    return NULL;
+    return nullptr;
 }
 
 /** private function **/
@@ -184,12 +186,13 @@ int buffer::__expand(size_t datlen)
 
         if (_origin_buf != _buf)
             __align();
-        if ((newbuf = (unsigned char *)realloc(_buf, length)) == NULL)
+        if ((newbuf = (unsigned char *)realloc(_buf, length)) == nullptr)
             return -1;
 
         _origin_buf = _buf = newbuf;
         _totallen = length;
     }
+    return 0;
 }
 
 void buffer::__align()

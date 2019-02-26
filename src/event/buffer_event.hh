@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include <rw_event.hh>
 #include <buffer.hh>
 
@@ -7,27 +9,31 @@ namespace eve
 {
 
 class buffer_event;
-typedef void (*bufferevent_cb_t)(buffer_event *);
+using BufferEvCallback = std::function<void(buffer_event *)>;
 
 class buffer_event : public rw_event
 {
 public:
-  buffer *input_buffer;
-  buffer *output_buffer;
-  bufferevent_cb_t readcb = nullptr;
-  bufferevent_cb_t writecb = nullptr;
-  bufferevent_cb_t errorcb = nullptr;
+  std::shared_ptr<buffer> input_buffer;
+  std::shared_ptr<buffer> output_buffer;
+  BufferEvCallback readcb;
+  BufferEvCallback writecb;
+  BufferEvCallback errorcb;
 
 public:
 public:
-  buffer_event(event_base *base);
-  ~buffer_event();
+  buffer_event(std::shared_ptr<event_base> base) : rw_event(base) { init(); }
+  buffer_event(std::shared_ptr<event_base> base, int fd, TYPE t) : rw_event(base, fd, t) { init(); }
 
-  inline void set_readcb(bufferevent_cb_t cb) { readcb = cb; }
-  inline void set_writecb(bufferevent_cb_t cb) { writecb = cb; }
-  inline void set_errorcb(bufferevent_cb_t cb) { errorcb = cb; }
+  ~buffer_event() {}
 
-  inline void set_cb(bufferevent_cb_t readcb, bufferevent_cb_t writecb, bufferevent_cb_t errcb)
+  void init();
+
+  inline void set_readcb(BufferEvCallback cb) { readcb = cb; }
+  inline void set_writecb(BufferEvCallback cb) { writecb = cb; }
+  inline void set_errorcb(BufferEvCallback cb) { errorcb = cb; }
+
+  inline void set_cb(BufferEvCallback readcb, BufferEvCallback writecb, BufferEvCallback errcb)
   {
     if (readcb)
       this->readcb = readcb;
@@ -54,7 +60,7 @@ public:
   }
 
 private:
-  static void buffer_event_cb(event *ev);
+  static void buffer_event_cb(buffer_event *ev);
 
   static void default_cb(buffer_event *ev);
 };

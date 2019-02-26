@@ -51,7 +51,7 @@ void select_base::check_fdset()
         else
         {
             assert(kv.second);
-            assert(kv.second->_fd == kv.first);
+            // assert(kv.second->_fd == kv.first);
         }
         if (iread)
             assert(kv.second->is_readable());
@@ -79,7 +79,7 @@ int select_base::dispatch(struct timeval *tv)
         return -1;
     }
 
-    int res = select(_fds + 1, event_readset_out, event_writeset_out, NULL, tv);
+    int res = select(_fds + 1, event_readset_out, event_writeset_out, nullptr, tv);
 
     // check_fdset();
 
@@ -184,7 +184,7 @@ int select_base::add(rw_event *ev)
     if (this->_fdsz - 1 < ev->fd)
     {
         int fdsz = this->_fdsz;
-        if (fdsz < sizeof(fd_mask))
+        if (fdsz < static_cast<int>(sizeof(fd_mask)))
             fdsz = sizeof(fd_mask);
 
         int needsize = ((ev->fd + NFDBITS) / NFDBITS) * sizeof(fd_mask);

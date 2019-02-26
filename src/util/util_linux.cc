@@ -11,7 +11,7 @@ std::string get_date()
     char date[50];
     struct tm cur;
     struct tm *cur_p;
-    time_t t = time(NULL);
+    time_t t = time(nullptr);
     gmtime_r(&t, &cur);
     cur_p = &cur;
     if (strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S GMT", cur_p) != 0)

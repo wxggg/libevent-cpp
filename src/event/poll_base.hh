@@ -12,19 +12,19 @@ class rw_event;
 class poll_base : public event_base
 {
   private:
-    std::map<int, struct pollfd *> fd_map_poll;
+	std::map<int, struct pollfd *> fd_map_poll;
 
   public:
-    poll_base() {}
-    ~poll_base() {}
+	poll_base() {}
+	~poll_base() {}
 
-    int add(rw_event *ev);
-    int del(rw_event *ev);
-    int recalc();
-    int dispatch(struct timeval *tv);
+	int add(rw_event *ev) override;
+	int del(rw_event *ev) override;
+	int recalc() override;
+	int dispatch(struct timeval *tv) override;
 
   private:
-    void poll_check();
+	void poll_check();
 };
 
 } // namespace eve

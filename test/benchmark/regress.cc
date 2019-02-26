@@ -17,7 +17,7 @@
 using namespace eve;
 using namespace std;
 
-event_base *pbase;
+std::shared_ptr<event_base> pbase;
 
 static int fdpair[2];
 static int test_ok = 0;
@@ -57,10 +57,8 @@ int cleanup_test(void)
     return 0;
 }
 /************************************ test 1 2 ***********************/
-void simple_read_cb(event *argev)
+void simple_read_cb(rw_event *ev)
 {
-    rw_event *ev = (rw_event *)argev;
-
     char buf[256];
     int len = read(ev->fd, buf, sizeof(buf));
 
@@ -78,9 +76,8 @@ void simple_read_cb(event *argev)
     called++;
 }
 
-void simple_write_cb(event *argev)
+void simple_write_cb(rw_event *ev)
 {
-    rw_event *ev = (rw_event *)argev;
     const char *t = "this is a test";
     int len = write(ev->fd, t, strlen(t) + 1);
     if (len == -1)
@@ -91,14 +88,14 @@ void simple_write_cb(event *argev)
 
 void test1(void)
 {
-    rw_event ev(pbase);
     const char *t1 = "Simple read :";
     setup_test(t1);
 
     write(fdpair[0], t1, strlen(t1) + 1);
     shutdown(fdpair[0], SHUT_WR);
 
-    ev.set(fdpair[1], READ, simple_read_cb);
+    rw_event ev(pbase, fdpair[1], READ);
+    ev.set_callback(simple_read_cb, &ev);
     ev.add();
 
     pbase->loop();
@@ -108,10 +105,10 @@ void test1(void)
 
 void test2(void)
 {
-    rw_event ev(pbase);
     setup_test("Simple write: ");
 
-    ev.set(fdpair[0], WRITE, simple_write_cb);
+    rw_event ev(pbase, fdpair[0], WRITE);
+    ev.set_callback(simple_write_cb, &ev);
     ev.add();
     pbase->loop();
 
@@ -124,15 +121,14 @@ static int roff;
 static int woff;
 static int usepersist;
 
-void multiple_write_cb(event *argev)
+void multiple_write_cb(rw_event *ev)
 {
-    rw_event *ev = (rw_event *)argev;
-
     int len = 128;
-    if (woff + len >= sizeof(wbuf))
+    if (woff + len >= static_cast<int>(sizeof(wbuf)))
         len = sizeof(wbuf) - woff;
 
     len = write(ev->fd, wbuf + woff, len);
+    cout<<"len="<<len<<endl;
 
     if (len == -1)
     {
@@ -142,7 +138,7 @@ void multiple_write_cb(event *argev)
         return;
     }
     woff += len;
-    if (woff >= sizeof(wbuf))
+    if (woff >= static_cast<int>(sizeof(wbuf)))
     {
         shutdown(ev->fd, SHUT_WR);
         if (usepersist)
@@ -153,11 +149,10 @@ void multiple_write_cb(event *argev)
         ev->add();
 }
 
-void multiple_read_cb(event *argev)
+void multiple_read_cb(rw_event *ev)
 {
-    rw_event *ev = (rw_event *)argev;
-
     int len = read(ev->fd, rbuf + roff, sizeof(rbuf) - roff);
+    cout<<"read len="<<len<<endl;
     if (len == -1)
         cerr << __func__ << " : read errno=" << errno << endl;
     if (len <= 0)
@@ -173,21 +168,19 @@ void multiple_read_cb(event *argev)
 
 void test3(void)
 {
-    rw_event rev(pbase), wev(pbase);
-
     setup_test("Multiple read/write: ");
 
+    rw_event rev(pbase, fdpair[0], READ), wev(pbase, fdpair[1], WRITE);
+
     memset(rbuf, 0, sizeof(rbuf));
-    for (int i = 0; i < sizeof(wbuf); i++)
-    {
-        wbuf[i] = i%32+32;
-    }
+    for (int i = 0; i < static_cast<int>(sizeof(wbuf)); i++)
+        wbuf[i] = i % 32 + 32;
 
     roff = woff = 0;
     usepersist = 0;
 
-    wev.set(fdpair[0], WRITE, multiple_write_cb);
-    rev.set(fdpair[1], READ, multiple_read_cb);
+    wev.set_callback(multiple_write_cb, &wev);
+    rev.set_callback(multiple_read_cb, &rev);
 
     rev.add();
     wev.add();
@@ -202,21 +195,21 @@ void test3(void)
 
 void test4(void)
 {
-    rw_event rev(pbase), wev(pbase);
-
     setup_test("Persist read/write: ");
 
+    rw_event rev(pbase, fdpair[0], READ), wev(pbase, fdpair[1], WRITE);
+
     memset(rbuf, 0, sizeof(rbuf));
-    for (int i = 0; i < sizeof(wbuf); i++)
+    for (int i = 0; i < static_cast<int>(sizeof(wbuf)); i++)
         wbuf[i] = i;
 
     roff = woff = 0;
     usepersist = 1;
 
-    wev.set(fdpair[0], WRITE, multiple_write_cb);
+    wev.set_callback(multiple_write_cb, &wev);
     wev.set_persistent();
 
-    rev.set(fdpair[1], READ, multiple_read_cb);
+    rev.set_callback(multiple_read_cb, &rev);
     rev.set_persistent();
 
     rev.add();
@@ -232,10 +225,8 @@ void test4(void)
 
 /**************************************** test 5 ******************************/
 
-void combined_rw_cb(event *argev)
+void combined_rw_cb(rw_event *ev, int *pnr, int *pnw)
 {
-    rw_event *ev = (rw_event *)argev;
-    int *pnr = (int *)ev->rdata, *pnw = (int *)ev->wdata;
     char rbuf[4096], wbuf[4096];
 
     int rlen, wlen;
@@ -279,19 +270,15 @@ void combined_rw_cb(event *argev)
 
 void test5(void)
 {
-    rw_event rw1(pbase), rw2(pbase);
     setup_test("Combined read/write: ");
+
+    rw_event rw1(pbase, fdpair[0], RDWR), rw2(pbase, fdpair[1], RDWR);
 
     int nreadr1 = 0, nreadr2 = 0;
     int nreadw1 = 4096, nreadw2 = 8192;
 
-    rw1.rdata = &nreadr1;
-    rw1.wdata = &nreadw1;
-    rw2.rdata = &nreadr2;
-    rw2.wdata = &nreadw2;
-
-    rw1.set(fdpair[0], RDWR, combined_rw_cb);
-    rw2.set(fdpair[1], RDWR, combined_rw_cb);
+    rw1.set_callback(combined_rw_cb, &rw1, &nreadr1, &nreadw1);
+    rw2.set_callback(combined_rw_cb, &rw2, &nreadr2, &nreadw2);
 
     rw1.add();
     rw2.add();
@@ -310,12 +297,11 @@ void test5(void)
 static struct timeval tset;
 static struct timeval tcalled;
 
-void timeout_cb(event *argev)
+void timeout_cb(time_event *ev)
 {
-    rw_event *ev = (rw_event *)argev;
     struct timeval tv;
 
-    gettimeofday(&tcalled, NULL);
+    gettimeofday(&tcalled, nullptr);
     if (timercmp(&tcalled, &tset, >))
         timersub(&tcalled, &tset, &tv);
     else
@@ -331,40 +317,40 @@ void timeout_cb(event *argev)
 
 void test6(void)
 {
+    setup_test("Simple timeout: ");
+
     time_event ev(pbase);
     struct timeval tv;
 
-    setup_test("Simple timeout: ");
-
     ev.set_timer(SECONDS, 0);
-    ev.set_callback(timeout_cb);
+    ev.set_callback(timeout_cb, &ev);
     ev.add();
 
-    gettimeofday(&tset, NULL);
+    gettimeofday(&tset, nullptr);
     pbase->loop();
 
     cleanup_test();
 }
 
-void signal_cb(event *argev)
+void signal_cb(signal_event *ev)
 {
-    signal_event *ev = (signal_event *)argev;
     ev->del();
     test_ok = 1;
 }
 
 void test7(void)
 {
-    signal_event ev(pbase);
+    setup_test("Simple signal: ");
+
+    signal_event ev(pbase, SIGALRM);
     struct itimerval itv;
 
-    setup_test("Simple signal: ");
-    ev.set(SIGALRM, signal_cb);
+    ev.set_callback(signal_cb, &ev);
     ev.add();
 
     memset(&itv, 0, sizeof(itv));
     itv.it_value.tv_sec = 1;
-    if (setitimer(ITIMER_REAL, &itv, NULL) == -1)
+    if (setitimer(ITIMER_REAL, &itv, nullptr) == -1)
         goto skip_simplesignal;
 
     pbase->loop();
@@ -374,7 +360,7 @@ skip_simplesignal:
     cleanup_test();
 }
 
-void loopexit_cb(event *argev)
+void loopexit_cb()
 {
     pbase->set_terminated(true);
 }
@@ -387,7 +373,7 @@ void test8(void)
     setup_test("Loop exit: ");
 
     ev.set_timer(60 * 60 * 24, 0);
-    ev.set_callback(timeout_cb);
+    ev.set_callback(timeout_cb, &ev);
     ev.add();
 
     time_event loopexit(pbase);
@@ -395,9 +381,9 @@ void test8(void)
     loopexit.set_callback(loopexit_cb);
     loopexit.add();
 
-    gettimeofday(&tv_start, NULL);
+    gettimeofday(&tv_start, nullptr);
     pbase->loop();
-    gettimeofday(&tv_end, NULL);
+    gettimeofday(&tv_end, nullptr);
 
     timersub(&tv_end, &tv_start, &tv);
 
@@ -433,19 +419,15 @@ void errorcb(buffer_event *bev)
 
 void test9(void)
 {
-    buffer_event bev1(pbase), bev2(pbase);
     setup_test("Bufferevent:  ");
 
-    bev1.set_fd(fdpair[0]);
-    bev1.set_write();
-    bev1.set_cb(0, writecb, errorcb);
+    buffer_event bev1(pbase, fdpair[0], WRITE), bev2(pbase, fdpair[1], READ);
 
-    bev2.set_fd(fdpair[1]);
-    bev2.set_read();
+    bev1.set_cb(0, writecb, errorcb);
     bev2.set_cb(readcb, 0, errorcb);
 
     char buffer[8333];
-    for (int i = 0; i < sizeof(buffer); i++)
+    for (int i = 0; i < static_cast<int>(sizeof(buffer)); i++)
         buffer[i] = i + 1;
 
     bev2.add();
@@ -474,17 +456,10 @@ void ecb(buffer_event *bev)
 
 void test10(void)
 {
-    buffer_event bev1(pbase), bev2(pbase);
     setup_test("Combined Bufferevent:  ");
+    buffer_event bev1(pbase, fdpair[0], RDWR), bev2(pbase, fdpair[1], RDWR);
 
-    bev1.set_fd(fdpair[0]);
-    bev1.set_read();
-    bev1.set_write();
     bev1.set_cb(test10_readcb, wcb, ecb);
-
-    bev2.set_fd(fdpair[1]);
-    bev2.set_read();
-    bev2.set_write();
     bev2.set_cb(test10_readcb, wcb, ecb);
 
     char bufw1[4096], bufw2[8192];
@@ -508,17 +483,13 @@ void test10(void)
 
 /**************************************** test priroties ******************************/
 
-void test_priorities_cb(event *argev)
+void test_priorities_cb(time_event *ev, int *count)
 {
-    // cout << __func__ << endl;
-    time_event *ev = (time_event *)argev;
-    int *count = (int *)ev->data;
     if (*count == 3)
     {
         pbase->set_terminated(true);
         return;
     }
-
     (*count)++;
 
     ev->set_timer(0, 0);
@@ -536,15 +507,13 @@ void test_priorities(int npriorities)
     int count1 = 0, count2 = 0;
 
     time_event tev1(pbase), tev2(pbase);
-    tev1.set_callback(test_priorities_cb);
+    tev1.set_callback(test_priorities_cb, &tev1, &count1);
     tev1.set_timer(0, 0);
     tev1.set_priority(0);
-    tev1.data = &count1;
 
-    tev2.set_callback(test_priorities_cb);
+    tev2.set_callback(test_priorities_cb, &tev2, &count2);
     tev2.set_timer(0, 0);
     tev2.set_priority(npriorities - 1);
-    tev2.data = &count2;
 
     tev1.add();
     tev2.add();
@@ -570,7 +539,7 @@ void test_priorities(int npriorities)
 
 int main(int argc, char const *argv[])
 {
-    pbase = new epoll_base();
+    pbase = std::make_shared<epoll_base>();
     // pbase = new select_base();
     // pbase = new poll_base();
 
@@ -586,7 +555,7 @@ int main(int argc, char const *argv[])
 
     test6();
 
-    // test7();
+    test7();
 
     test8();
 
@@ -597,8 +566,6 @@ int main(int argc, char const *argv[])
     test_priorities(1);
     test_priorities(2);
     test_priorities(3);
-
-    delete pbase;
 
     return 0;
 }

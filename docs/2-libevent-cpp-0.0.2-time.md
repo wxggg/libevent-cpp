@@ -6,7 +6,7 @@
 class event
 {
   public:
-	event_base *_base;
+	std::shared_ptr<event_base>_base;
 	short _events; /* EV_TIMEOUT EV_READ EV_WRITE EV_SIGNAL EV_PERSIST */
 	short _ncalls = 0;
 	int _pri; /* smaller numbers means higher priority */
@@ -15,10 +15,10 @@ class event
 	int _res; /* result passed to event callback */
 
   public:
-	event(event_base *base);
+	event(std::shared_ptr<event_base>base);
 	virtual ~event() { std::cout << __func__ << std::endl; }
 
-	void set_base(event_base *base) { _base = base; }
+	void set_base(std::shared_ptr<event_base>base) { _base = base; }
 	void set_callback(void (*callback)(short, void *)) { _callback = callback; }
 
 	virtual void add() {}
@@ -38,7 +38,7 @@ class signal_event : public event
     int sig = -1;
 
   public:
-    signal_event(event_base *base);
+    signal_event(std::shared_ptr<event_base>base);
     ~signal_event() { std::cout << __func__ << std::endl; }
 
     void set_sig(int sig) { sig = sig; }
@@ -61,7 +61,7 @@ void signal_event::del()
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
     this->base->signalqueue.remove(this);
     sigdelset(&this->base->evsigmask, sig);
-    sigaction(sig, (struct sigaction*)SIG_DFL, NULL);
+    sigaction(sig, (struct sigaction*)SIG_DFL, nullptr);
 }
 ```
 
@@ -75,7 +75,7 @@ class time_event : public event
     struct timeval timeout;
 
   public:
-    time_event(event_base *base);
+    time_event(std::shared_ptr<event_base>base);
     ~time_event() { std::cout << __func__ << std::endl; }
 
     void set_timer(int nsec);
@@ -92,7 +92,7 @@ class time_event : public event
 void timeout_cb(short event, void *arg)
 {
 	time_event *timeout = (time_event *)arg;
-	int newtime = time(NULL);
+	int newtime = time(nullptr);
 
 	cout << __func__ << ": called at " << newtime << endl;
 
@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 void time_event::set_timer(int nsec)
 {
     struct timeval now, tv;
-    gettimeofday(&now, NULL);
+    gettimeofday(&now, nullptr);
 
     timerclear(&tv);
     tv.tv_sec = nsec;
@@ -148,7 +148,7 @@ bool cmp_timeev::operator()(time_event *const &lhs, time_event *const &rhs) cons
 ```
 
 ### 主循环
-主循环中现在主要包括如下部分，首先是判断各个数据结构中是否还有事件，如果全都不存在的话那么说明已经全部处理完成可以直接退出。否则会进入dispatch将事件分发下去处理，需要注意的就是对于时间事件来说，这里需要确定dipatch的执行方式，如果没有时间事件的话给`dispatch`传入的参数是NULL，也就是说没有设置超时参数。如果存在超时事件又该如何呢，需要判断超时集合`timeevset`中是否存在已经到时间的事件，判断的方式也比较简单，当最前面的事件没有超时那么就全部都没有超时，这时就应该继续分发事件，执行dispatch，并附带一个最前面的时间事件的超时间隔。
+主循环中现在主要包括如下部分，首先是判断各个数据结构中是否还有事件，如果全都不存在的话那么说明已经全部处理完成可以直接退出。否则会进入dispatch将事件分发下去处理，需要注意的就是对于时间事件来说，这里需要确定dipatch的执行方式，如果没有时间事件的话给`dispatch`传入的参数是nullptr，也就是说没有设置超时参数。如果存在超时事件又该如何呢，需要判断超时集合`timeevset`中是否存在已经到时间的事件，判断的方式也比较简单，当最前面的事件没有超时那么就全部都没有超时，这时就应该继续分发事件，执行dispatch，并附带一个最前面的时间事件的超时间隔。
 ```c++
 while (!done)
 {
@@ -157,10 +157,10 @@ while (!done)
 
     int res;
     struct timeval now, off;
-    gettimeofday(&now, NULL);
+    gettimeofday(&now, nullptr);
     if (timeevset.empty()) {
         /* no timeout event */
-        res = this->dispatch(NULL);
+        res = this->dispatch(nullptr);
     }
     else {
         time_event *timeev = *timeevset.begin();
@@ -188,7 +188,7 @@ while (!done)
 ```c++
 int select_base::dispatch(struct timeval *tv) {
     //...
-    int res = select(event_fds, event_readset_out, event_writeset_out, NULL, tv);
+    int res = select(event_fds, event_readset_out, event_writeset_out, nullptr, tv);
     //...
 }
 ```
@@ -198,7 +198,7 @@ void event_base::timeout_process()
 {
 	std::cout << __func__ << std::endl;
 	struct timeval now;
-	gettimeofday(&now, NULL);
+	gettimeofday(&now, nullptr);
 
 	time_event *ev;
 	std::set<time_event *, cmp_timeev>::iterator i = timeevset.begin();
@@ -217,8 +217,8 @@ void event_base::event_process_active()
     //选一个最高优先级且不空的激活队列activeq
 	if (!activeq.empty())
 	{
-		event *ev;
-		std::list<event *>::iterator i = activeq.begin();
+		std::shared_ptr<event> ev;
+		std::list<std::shared_ptr<event>>::iterator i = activeq.begin();
 		while (i != activeq.end())
 		{
 			ev = *i;

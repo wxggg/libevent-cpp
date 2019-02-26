@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <memory>
+#include <iostream>
 
 namespace eve
 {
@@ -44,7 +46,7 @@ class buffer
 
 	/* push_back and pop_front */
 	int push_back(void *data, size_t datlen);
-	int push_back_buffer(buffer *inbuf, size_t datlen);
+	int push_back_buffer(std::shared_ptr<buffer> inbuf, int datlen);
 	inline int push_back_string(const std::string &s)
 	{
 		return push_back((void *)s.c_str(), s.size());
@@ -54,6 +56,8 @@ class buffer
 	unsigned char *find(unsigned char *what, size_t len);
 	inline unsigned char *find_string(const std::string & what)
 	{
+		std::cout<<__func__<<std::endl;
+		std::cout<<_buf<<std::endl;
 		return find((unsigned char *)what.c_str(), what.length());
 	}
 

@@ -6,11 +6,6 @@
 #include <iostream>
 namespace eve
 {
-    
-signal_event::signal_event(event_base *base)
-    :event(base)
-{
-}
 
 signal_event::~signal_event()
 {
@@ -27,8 +22,7 @@ int signal_event::del()
 {
     this->base->signalqueue.remove(this);
     sigdelset(&this->base->evsigmask, sig);
-    return sigaction(sig, (struct sigaction*)SIG_DFL, NULL);
+    return sigaction(sig, (struct sigaction *)SIG_DFL, nullptr);
 }
 
-
-} // eve
+} // namespace eve

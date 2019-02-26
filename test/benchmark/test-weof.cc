@@ -16,11 +16,10 @@ using namespace eve;
 int fdpair[2];
 int called = 0;
 
-void write_cb(event *argev)
+void write_cb(rw_event *ev)
 {
     cout << __func__ << " called\n";
-    rw_event *ev = (rw_event *)argev;
-    char *test = "test string";
+    const char *test = "test string";
     int len = write(ev->fd, test, strlen(test) + 1);
 
     cout << "len = " << len << endl;
@@ -45,14 +44,13 @@ int main(int argc, char const *argv[])
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, fdpair) == -1)
         return 1;
 
-    // epoll_base base;
-    poll_base base;
+    auto base = std::make_shared<poll_base>();
 
-    rw_event *ev = new rw_event(&base);
-    ev->set(fdpair[1], WRITE, write_cb);
-    ev->add();
+    rw_event ev(base, fdpair[1], WRITE);
+    ev.set_callback(write_cb, &ev);
+    ev.add();
 
-    base.loop();
+    base->loop();
 
     return 0;
 }

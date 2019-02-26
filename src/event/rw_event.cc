@@ -7,11 +7,6 @@
 namespace eve
 {
 
-rw_event::rw_event(event_base *base)
-    : event(base)
-{
-}
-
 rw_event::~rw_event()
 {
     del_read();

@@ -13,13 +13,13 @@ namespace eve
 
 /** class http_connection **/
 
-http_connection::http_connection(event_base *base)
+http_connection::http_connection(std::shared_ptr<event_base> base)
     : buffer_event(base)
 {
     this->state = DISCONNECTED;
     set_type(RDWR);
 
-    this->set_callback(__http_connection_event_cb);
+    this->set_callback(__http_connection_event_cb, this);
 
     this->read_timer = new time_event(base);
     this->write_timer = new time_event(base);
@@ -30,8 +30,8 @@ http_connection::~http_connection()
     /* notify interested parties that this connection is going down */
     if (this->fd != -1)
     {
-        if (this->is_connected() && this->closecb != NULL)
-            (*this->closecb)(this);
+        if (this->is_connected() && this->closecb != nullptr)
+            this->closecb(this);
     }
     del_read();
     del_write();
@@ -49,8 +49,8 @@ void http_connection::reset()
     {
         this->del();
         /* inform interested parties about connection close */
-        if (is_connected() && closecb != NULL)
-            (*closecb)(this);
+        if (is_connected() && closecb != nullptr)
+            closecb(this);
         closefd(fd);
         fd = -1;
     }
@@ -219,7 +219,7 @@ void http_connection::read_http()
 {
     if (is_closed() || requests.empty())
         return;
-    std::shared_ptr<http_request> req = requests.front();
+    auto req = requests.front();
     switch (state)
     {
     case READING_FIRSTLINE:
@@ -247,9 +247,8 @@ void http_connection::read_http()
 /** callback for active read or write events
  *  called by event_process()
  */
-void http_connection::__http_connection_event_cb(event *argev)
+void http_connection::__http_connection_event_cb(http_connection *conn)
 {
-    http_connection *conn = (http_connection *)argev;
     if (conn->is_closed())
         return;
     int res = 0;

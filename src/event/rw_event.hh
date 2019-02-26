@@ -35,7 +35,8 @@ class rw_event : public event
 	int timeout = -1;
 
   public:
-	rw_event(event_base *base);
+	rw_event(std::shared_ptr<event_base> base) : event(base) {}
+	rw_event(std::shared_ptr<event_base> base, int fd, TYPE t) : event(base), fd(fd) { set_type(t); }
 	~rw_event();
 
 	inline void set_fd(int fd) { this->fd = fd; }
@@ -73,13 +74,6 @@ class rw_event : public event
 
 	inline bool is_read_active() const { return _active_read; }
 	inline bool is_write_active() const { return _active_write; }
-
-	inline void set(int fd, TYPE t, void (*callback)(event *))
-	{
-		this->fd = fd;
-		set_type(t);
-		this->callback = callback;
-	}
 
 	int add();
 	int del();

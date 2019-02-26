@@ -7,6 +7,7 @@
 #include <queue>
 #include <string>
 #include <memory>
+#include <functional>
 
 namespace eve
 {
@@ -47,14 +48,14 @@ class http_connection : public buffer_event
 
 	std::queue<std::shared_ptr<http_request>> requests;
 
-	time_event *read_timer = NULL;
-	time_event *write_timer = NULL;
+	time_event *read_timer = nullptr;
+	time_event *write_timer = nullptr;
 
-	void (*closecb)(http_connection *) = NULL;
-	void (*connectioncb)(http_connection *) = NULL;
+	std::function<void(http_connection *)> closecb = nullptr;
+	std::function<void(http_connection *)> connectioncb = nullptr;
 
   public:
-	http_connection(event_base *base);
+	http_connection(std::shared_ptr<event_base>base);
 	virtual ~http_connection();
 
 	inline bool is_server_connection() const { return type == SERVER_CONNECTION; }
@@ -94,7 +95,8 @@ class http_connection : public buffer_event
 
 	inline void start_read()
 	{
-		if (is_closed()) return;
+		if (is_closed())
+			return;
 		this->add_read();
 		state = READING_FIRSTLINE;
 		if (timeout > 0)
@@ -105,7 +107,8 @@ class http_connection : public buffer_event
 	}
 	inline void start_write()
 	{
-		if (is_closed()) return;
+		if (is_closed())
+			return;
 		this->add_write();
 		state = WRITING;
 		if (timeout > 0)
@@ -124,7 +127,7 @@ class http_connection : public buffer_event
 	void read_trailer(std::shared_ptr<http_request> req);
 
   private:
-	static void __http_connection_event_cb(event *argev);
+	static void __http_connection_event_cb(http_connection *conn);
 };
 
 } // namespace eve

@@ -12,9 +12,9 @@ BASE_PATH = $(PWD)/..
 # Space-separated pkg-config libraries used by this project
 LIBS = -levent++ -L$(BASE_PATH)
 # General compiler flags
-COMPILE_FLAGS = -std=c++11 -Wall -Wextra -g -Wno-unused-parameter
+COMPILE_FLAGS = -std=c++14 -Wall -Wextra -g -Wno-unused-parameter
 # Add additional include paths
-INCLUDES = -I$(BASE_PATH)/src/event -I$(BASE_PATH)/src/http -I$(BASE_PATH)/src/util
+INCLUDES = -I$(BASE_PATH)/src/event -I$(BASE_PATH)/src/http -I$(BASE_PATH)/src/util -I$(BASE_PATH)/src/thread
 # General linker settings
 LINK_FLAGS = 
 #### END PROJECT SETTINGS ####
