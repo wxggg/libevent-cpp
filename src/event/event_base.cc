@@ -57,10 +57,9 @@ int event_base::loop()
 
 	int done = 0;
 	static int i = 0;
-	while (!done && i++ < 1000)
+	while (!done)
 	{
-		std::cout << "\n[event]"
-				  << " loop" << i << std::endl;
+		std::cout << "\n[event] loop" << i++ << std::endl;
 		/* Terminate the loop if we have been asked to */
 		if (this->_terminated)
 		{

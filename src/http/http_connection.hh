@@ -3,6 +3,7 @@
 #include <http_request.hh>
 #include <buffer_event.hh>
 #include <time_event.hh>
+#include <util_linux.hh>
 
 #include <queue>
 #include <string>
@@ -84,6 +85,7 @@ class http_connection : public buffer_event
 
 	inline void close()
 	{
+		closefd(fd); // close tcp connecton
 		state = CLOSED;
 		del();
 	}
