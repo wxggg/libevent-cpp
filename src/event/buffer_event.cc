@@ -14,7 +14,6 @@ void buffer_event::init()
 
 size_t buffer_event::write(void *data, size_t size)
 {
-    // std::cout << __PRETTY_FUNCTION__ << std::endl;
     int res = output_buffer->push_back(data, size);
 
     if (res == -1)
@@ -27,14 +26,11 @@ size_t buffer_event::write(void *data, size_t size)
 
 size_t buffer_event::read(void *data, size_t size)
 {
-    // std::cout << __PRETTY_FUNCTION__ << std::endl;
     return input_buffer->pop_front(data, size);
 }
 
 void buffer_event::buffer_event_cb(buffer_event *ev)
 {
-    // std::cout << __PRETTY_FUNCTION__ << " called\n";
-    // buffer_event *ev = (buffer_event *)argev;
     int res = 0;
 
     if (ev->is_read_active())

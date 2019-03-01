@@ -56,10 +56,9 @@ int event_base::loop()
 		return -1;
 
 	int done = 0;
-	static int i = 0;
 	while (!done)
 	{
-		std::cout << "\n[event] loop" << i++ << std::endl;
+		// std::cout << "\n[event] loop" << i++ << std::endl;
 		/* Terminate the loop if we have been asked to */
 		if (this->_terminated)
 		{
@@ -77,13 +76,8 @@ int event_base::loop()
 			return 1;
 		}
 
-		// std::cout<<"timev:"<<timeevset.size()<<std::endl;
-
-		// std::cout<<count_rw_events()<<":"<<nactive_events<<std::endl;
-
 		int res;
 		struct timeval off;
-		// struct timeval *tv = nullptr;
 		if (_loop_nonblock) // non block
 		{
 			timerclear(&off);
@@ -247,7 +241,6 @@ int event_base::evsignal_deliver()
 
 void event_base::readsig_cb()
 {
-	std::cout << __func__ << std::endl;
 	// static char signals[100];
 	// rw_event *ev = (rw_event *)argev;
 	// int n = read(ev->fd, signals, sizeof(signals));
@@ -261,7 +254,6 @@ void event_base::readsig_cb()
 
 void event_base::handler(int sig)
 {
-	std::cout << __func__ << std::endl;
 	sigcaught[sig]++;
 	caught = 1;
 

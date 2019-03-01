@@ -25,7 +25,7 @@ enum ERR
 	E_UNKNOW,
 };
 
-class event : public std::enable_shared_from_this<event>
+class event
 {
   private:
 	static int _internal_event_id;
@@ -53,10 +53,12 @@ class event : public std::enable_shared_from_this<event>
 	int err = -1;
 
   public:
+	event() {}
 	event(std::shared_ptr<event_base> base);
 	virtual ~event() {}
 
-	inline void set_base(std::shared_ptr<event_base> base) { this->base = base; }
+	void set_base(std::shared_ptr<event_base> base);
+
 
 	inline void set_active() { _active = true; }
 	inline void clear_active() { _active = false; }

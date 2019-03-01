@@ -2,7 +2,6 @@
 
 #include <string>
 #include <memory>
-#include <iostream>
 
 namespace eve
 {
@@ -56,8 +55,6 @@ class buffer
 	unsigned char *find(unsigned char *what, size_t len);
 	inline unsigned char *find_string(const std::string & what)
 	{
-		std::cout<<__func__<<std::endl;
-		std::cout<<_buf<<std::endl;
 		return find((unsigned char *)what.c_str(), what.length());
 	}
 

@@ -17,11 +17,16 @@ int event::_internal_event_id = 0;
 
 event::event(std::shared_ptr<event_base> base)
 {
-	this->base = base;
-	this->pri = this->base->activequeues.size() / 2;
+	set_base(base);
 	id = _internal_event_id++;
 
 	set_callback(default_callback, this);
+}
+
+void event::set_base(std::shared_ptr<event_base> base)
+{
+	this->base = base;
+	this->pri = base->activequeues.size() / 2;
 }
 
 void event::set_priority(int pri)

@@ -85,7 +85,7 @@ void http_server_connection::do_read_done()
         fail(HTTP_EOF);
         return;
     }
-    std::cout << "[server] done read request uri=" << req->uri << " type=" << req->type << std::endl;
+    // std::cout << "[server] done read request uri=" << req->uri << " type=" << req->type << std::endl;
 
     start_write();
     handle_request(req);
@@ -158,7 +158,6 @@ void http_server_connection::do_write_over()
 
     if (need_close)
     {
-        std::cerr << "[server] need close\n";
         close();
         return;
     }

@@ -35,6 +35,7 @@ class rw_event : public event
 	int timeout = -1;
 
   public:
+	rw_event() {}
 	rw_event(std::shared_ptr<event_base> base) : event(base) {}
 	rw_event(std::shared_ptr<event_base> base, int fd, TYPE t) : event(base), fd(fd) { set_type(t); }
 	~rw_event();

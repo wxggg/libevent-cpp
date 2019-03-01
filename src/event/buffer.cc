@@ -1,7 +1,6 @@
 #include <buffer.hh>
 #include <string>
 #include <cstring>
-#include <iostream>
 #include <unistd.h>
 
 namespace eve
@@ -65,9 +64,6 @@ int buffer::push_back_buffer(std::shared_ptr<buffer> inbuf, int datlen)
 {
     if (!inbuf)
         return 0;
-    std::cout<<inbuf->get_data()<<'\n';
-    std::cout<<"???"<<"datlen="<<datlen;
-    std::cout<<get_data()<<std::endl;
     int len = datlen;
     if (len > static_cast<int>(inbuf->_off) || datlen < 0)
         len = inbuf->_off;
@@ -75,8 +71,6 @@ int buffer::push_back_buffer(std::shared_ptr<buffer> inbuf, int datlen)
     if (res == 0)
         inbuf->__drain(len);
 
-    std::cout<<"-----\n";
-    std::cout<<get_data()<<std::endl;
     return res;
 }
 

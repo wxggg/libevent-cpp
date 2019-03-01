@@ -79,7 +79,7 @@ void http_request::send_page(std::shared_ptr<buffer> buf)
 
 void http_request::send_reply(int code, const std::string &reason, std::shared_ptr<buffer> buf)
 {
-    std::cerr << "[R] " << __func__ << " with code=" << code << " reason=" << reason << std::endl;
+    // std::cout << "[R] " << __func__ << " with code=" << code << " reason=" << reason << std::endl;
     set_response(code, reason);
     if (buf)
         __send(buf);

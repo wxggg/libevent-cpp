@@ -13,6 +13,8 @@ void zero()
 
 void first(int id)
 {
+    for(int i = 0; i<id; i++)
+        if(i % 13731 == 0) cout<<"X"<<endl;
     std::cout << "hello from " << id << ", function\n";
 }
 
@@ -54,77 +56,81 @@ void ugu(int id, Third &t)
 
 int main(int argc, char const *argv[])
 {
-    thread_pool pool(2);
-    pool.push(std::ref(zero));
+    thread_pool pool(8);
+    for(int i=0; i<1000000;i++)
+    {
+        pool.push(first, i);
+    }
+    // pool.push(std::ref(zero));
 
-    pool.push(first, 1);
-    pool.push(aga, 7, 4);
+    // pool.push(first, 1);
+    // pool.push(aga, 7, 4);
 
     
 
-    struct Second
-    {
-        Second(const std::string &s)
-        {
-            std::cout << "Second ctor\n";
-            this->s = s;
-        }
-        Second(Second &&c)
-        {
-            std::cout << "Second move ctor\n";
-            s = std::move(c.s);
-        }
-        Second(const Second &c)
-        {
-            std::cout << "Second copy ctor\n";
-            this->s = c.s;
-        };
-        ~Second() { std::cout << "Second dtor\n"; }
-        void operator()() const
-        {
-        }
+    // struct Second
+    // {
+    //     Second(const std::string &s)
+    //     {
+    //         std::cout << "Second ctor\n";
+    //         this->s = s;
+    //     }
+    //     Second(Second &&c)
+    //     {
+    //         std::cout << "Second move ctor\n";
+    //         s = std::move(c.s);
+    //     }
+    //     Second(const Second &c)
+    //     {
+    //         std::cout << "Second copy ctor\n";
+    //         this->s = c.s;
+    //     };
+    //     ~Second() { std::cout << "Second dtor\n"; }
+    //     void operator()() const
+    //     {
+    //     }
 
-      private:
-        std::string s;
-    } second(", functor");
-    pool.push(std::ref(second));
-    // this_thread::sleep_for(chrono::milliseconds(2000));
-    // pool.push(const_cast<const Second &>(second));
-    pool.push(move(second));
-    pool.push(second);
-    pool.push(Second(", functor"));
+    //   private:
+    //     std::string s;
+    // } second(", functor");
+    // pool.push(std::ref(second));
+    // // this_thread::sleep_for(chrono::milliseconds(2000));
+    // // pool.push(const_cast<const Second &>(second));
+    // pool.push(move(second));
+    // pool.push(second);
+    // pool.push(Second(", functor"));
 
-    auto f = pool.pop();
+    // auto f = pool.pop();
 
-    if (f)
-    {
-        std::cout << "poped function from the pool ";
-        f();
-    }
+    // if (f)
+    // {
+    //     std::cout << "poped function from the pool ";
+    //     f();
+    // }
 
 
-    pool.resize(4);
+    // pool.resize(4);
     
-    std::string s2 = "result";
-    auto f1 = pool.push([s2](){
-        return s2;
-    });
-    std::cout << "returned " << f1.get() << '\n';
+    // std::string s2 = "result";
+    // auto f1 = pool.push([s2](){
+    //     return s2;
+    // });
+    // std::cout << "returned " << f1.get() << '\n';
 
-    auto f2 = pool.push([](){
-        throw std::exception();
-    });
-    // other code here
-    //...
-    try {
-        f2.get();
-    }
-    catch (std::exception & e) {
-        std::cout << "caught exception\n";
-    }
+    // auto f2 = pool.push([](){
+    //     throw std::exception();
+    // });
+    // // other code here
+    // //...
+    // try {
+    //     f2.get();
+    // }
+    // catch (std::exception & e) {
+    //     std::cout << "caught exception\n";
+    // }
 
-    // get thread 0
-    auto & th = pool.get_thread(0);
+    // // get thread 0
+    // auto & th = pool.get_thread(0);
 
 
     return 0;

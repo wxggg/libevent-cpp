@@ -35,7 +35,6 @@ void poll_base::poll_check()
 
 int poll_base::dispatch(struct timeval *tv)
 {
-    // std::cout << __PRETTY_FUNCTION__ << std::endl;
     if (evsignal_deliver() == -1)
         return -1;
 

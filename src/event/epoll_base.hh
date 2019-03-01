@@ -1,3 +1,5 @@
+#pragma once
+
 #include "event_base.hh"
 
 #include <sys/epoll.h>

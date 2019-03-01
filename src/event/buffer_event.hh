@@ -22,6 +22,7 @@ public:
 
 public:
 public:
+  buffer_event() {}
   buffer_event(std::shared_ptr<event_base> base) : rw_event(base) { init(); }
   buffer_event(std::shared_ptr<event_base> base, int fd, TYPE t) : rw_event(base, fd, t) { init(); }
 

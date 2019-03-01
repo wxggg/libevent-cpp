@@ -29,6 +29,7 @@ class event_base
 	bool _loop_nonblock = false;
 	bool _loop_once = false;
 	bool _terminated = false;
+	int i = 0;
 
   public:
 	void set_terminated(bool flag) { _terminated = flag; }

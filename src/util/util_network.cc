@@ -126,7 +126,7 @@ int accept_socket(int fd, std::string &host, int &port)
     if (sockfd == -1)
     {
         if (errno != EAGAIN && errno != EINTR)
-            std::cerr << "[network] " << __func__ << ": accept err\n";
+            std::cerr << "[network] " << __func__ << ": accept err errno="<<errno<<std::endl;
         return -1;
     }
     if (set_fd_nonblock(sockfd) == -1)
@@ -190,7 +190,7 @@ int listenfd(int fd)
 {
     if (listen(fd, 128) == -1)
     {
-        std::cout << "[network] " << __func__ << ":listen err\n";
+        std::cerr << "[network] " << __func__ << ":listen err\n";
         close(fd);
         return -1;
     }

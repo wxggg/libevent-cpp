@@ -15,6 +15,7 @@ public:
   unsigned int clientport;
 
 public:
+  http_server_connection() {}
   http_server_connection(std::shared_ptr<event_base> base, std::shared_ptr<http_server> server);
   ~http_server_connection();
 

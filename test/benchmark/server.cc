@@ -2,15 +2,16 @@
 #include <epoll_base.hh>
 
 #include <memory>
+#include <chrono>
 
 using namespace std;
 using namespace eve;
 
 void home(shared_ptr<http_request> req)
 {
-    cerr << __func__ << " called\n";
+    // cerr << __func__ << " called\n";
     std::shared_ptr<buffer> buf = std::make_shared<buffer>();
-    buf->push_back_string("This is funny");
+    buf->push_back_string("This is funnyThis is funnyThis iunny");
 
     /* allow sending of an empty reply */
     req->send_reply(HTTP_OK, "Everything is fine", req->input_headers["Empty"].empty() ? buf : nullptr);
@@ -24,7 +25,8 @@ int main(int argc, char const *argv[])
     server->set_handle_cb("/", home);
     server->start("localhost", 8080);
 
-    base->loop();
+    server->resize_thread_pool(8);
 
+    base->loop();
     return 0;
 }

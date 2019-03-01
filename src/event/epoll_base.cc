@@ -30,7 +30,6 @@ int epoll_base::recalc()
 
 int epoll_base::dispatch(struct timeval *tv)
 {
-	// std::cout << __PRETTY_FUNCTION__ << std::endl;
 	if (evsignal_deliver() == -1)
 		return -1;
 
@@ -101,7 +100,6 @@ int epoll_base::add(rw_event *ev)
 	if (epev.events & EPOLLOUT)
 		ev->epoll_out = true;
 
-	// std::cout << "id=" << ev->id << "__add____________________op=" << op << " events=" << epev.events << std::endl;
 	if (epoll_ctl(_epfd, op, ev->fd, &epev) == -1)
 		return -1;
 	return 0;
@@ -109,7 +107,6 @@ int epoll_base::add(rw_event *ev)
 
 int epoll_base::del(rw_event *ev)
 {
-	// std::cout << __PRETTY_FUNCTION__ << std::endl;
 	struct epoll_event epev = {0, {0}};
 	epev.data.ptr = ev;
 	int events = 0;
@@ -148,8 +145,6 @@ int epoll_base::del(rw_event *ev)
 	}
 
 	epev.events = events;
-
-	// std::cout << "id=" << ev->id << "__del____________________op=" << op << " events=" << events << std::endl;
 
 	if (epoll_ctl(_epfd, op, ev->fd, &epev) == -1)
 		return -1;

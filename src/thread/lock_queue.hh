@@ -1,3 +1,5 @@
+#pragma once
+
 #include <queue>
 #include <mutex>
 
@@ -35,6 +37,12 @@ class lock_queue
     {
         Lock lock(mutex);
         return q.empty();
+    }
+
+    int size()
+    {
+        Lock lock(mutex);
+        return q.size();
     }
 };
 

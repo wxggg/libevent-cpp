@@ -56,6 +56,7 @@ class http_connection : public buffer_event
 	std::function<void(http_connection *)> connectioncb = nullptr;
 
   public:
+	http_connection(){}
 	http_connection(std::shared_ptr<event_base>base);
 	virtual ~http_connection();
 
