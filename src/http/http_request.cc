@@ -26,6 +26,15 @@ http_request::~http_request()
 {
 }
 
+std::shared_ptr<event_base> http_request::get_base()
+{
+    if (!conn) 
+    {
+        std::cerr<<"[ERROR] req->conn is nullptr\n";
+    }
+    return conn->base;
+}
+
 void http_request::send_error(int error, std::string reason)
 {
     std::string err_page = "<html><head>";

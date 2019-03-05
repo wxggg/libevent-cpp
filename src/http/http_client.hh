@@ -17,6 +17,8 @@ public:
   http_client(std::shared_ptr<event_base> base);
   ~http_client();
 
+  inline void set_timeout(int sec) { timeout = sec; }
+
   /** return id of connection from 0 1 2...
      *  error if return -1 */
   int make_connection(const std::string &address, unsigned int port);

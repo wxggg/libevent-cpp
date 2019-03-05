@@ -21,6 +21,7 @@ http_server_connection::http_server_connection(std::shared_ptr<event_base> base,
     : http_connection(base)
 {
     this->server = server;
+    this->timeout = server->timeout;
     read_timer->set_callback(read_timeout_cb, this);
     write_timer->set_callback(write_timeout_cb, this);
 
@@ -35,7 +36,7 @@ http_server_connection::~http_server_connection()
 void http_server_connection::fail(http_connection_error error)
 {
     auto req = requests.front();
-    std::cerr << "[FAIL] " << __func__ << " req->uri=" << req->uri << " with error=" << error << std::endl;
+    std::cerr << "[server:FAIL] " << __func__ << " req->uri=" << req->uri << " with error=" << error << std::endl;
 
     /* 
      * for incoming requests, there are two different
@@ -56,7 +57,6 @@ void http_server_connection::fail(http_connection_error error)
          * case may happen when a browser keeps a persistent
          * connection open and we timeout on the read.
          */
-        close();
         return;
     case HTTP_INVALID_HEADER:
     default: /* xxx: probably should just error on default */

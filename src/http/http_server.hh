@@ -43,8 +43,7 @@ class http_server : public std::enable_shared_from_this<http_server>
 
 	std::list<rw_event *> sockets;
 	std::map<std::string, HandleCallBack> handle_callbacks;
-	// lock_queue<std::shared_ptr<http_client_info>> clientQueue;
-	lock_queue<http_client_info *> clientQueue;
+	lock_queue<std::shared_ptr<http_client_info>> clientQueue;
 
 	std::string address;
 	int port;
@@ -75,7 +74,6 @@ class http_server : public std::enable_shared_from_this<http_server>
 	int start(const std::string &address, unsigned short port);
 
 	void clean_connections();
-	void get_connection(int fd, const std::string &host, int port);
 	void wakeup(int nloops); // wakeup the ith thread in pool
 
   private:

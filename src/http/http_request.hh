@@ -41,6 +41,7 @@ enum message_read_status
 #define HTTP_NOTFOUND 404
 #define HTTP_SERVUNAVAIL 503
 
+class event_base;
 class http_connection;
 class http_request
 {
@@ -59,9 +60,9 @@ class http_request
 
     enum http_request_kind kind;
     enum http_cmd_type type;
-    std::string uri; /* uri after HTTP request was parsed */
-    unsigned short major = 1;      /* HTTP Major number */
-    unsigned short minor = 1;      /* HTTP Minor number */
+    std::string uri;          /* uri after HTTP request was parsed */
+    unsigned short major = 1; /* HTTP Major number */
+    unsigned short minor = 1; /* HTTP Minor number */
 
     int response_code;              /* HTTP Response code */
     std::string response_code_line; /* Readable response */
@@ -72,7 +73,7 @@ class http_request
     int chunked = 0;
 
     // void (*cb)(std::shared_ptr<http_request>) = nullptr;
-    std::function<void (std::shared_ptr<http_request>)> cb = nullptr;
+    std::function<void(std::shared_ptr<http_request>)> cb = nullptr;
     // void (*chunk_cb)(std::shared_ptr<http_request>);
 
     std::map<std::string, std::string> input_headers;
@@ -90,6 +91,8 @@ class http_request
     }
 
     inline void set_cb(void (*cb)(std::shared_ptr<http_request>)) { this->cb = cb; }
+
+    std::shared_ptr<event_base> get_base();
 
     inline int is_connection_keepalive()
     {

@@ -24,7 +24,7 @@ void dispatch_connections(rw_event *ev, std::shared_ptr<event_base> base, http_s
     size_t n = read(ev->fd, buf, sizeof(buf));
 
     int i = 0;
-    http_client_info *cinfo;
+    std::shared_ptr<http_client_info> cinfo;
     while (server->clientQueue.pop(cinfo))
     {
         auto conn = new http_server_connection(base, server->shared_from_this());
@@ -58,7 +58,7 @@ static void __listen_cb(int fd, http_server *server)
     int nfd = accept_socket(fd, host, port);
     // std::cout << "[server] ===> new client in with fd=" << nfd << " hostname="
     //           << host << " portname=" << port << std::endl;
-    auto cinfo = new http_client_info(nfd, host, port);
+    auto cinfo = std::make_shared<http_client_info>(nfd, host, port);
     server->clientQueue.push(cinfo);
     server->set_loops();
     server->wakeup(1);
@@ -110,10 +110,6 @@ void http_server::set_loops()
             pool->push(loop_task, _base);
         }
     }
-}
-
-void http_server::get_connection(int fd, const std::string &host, int port)
-{
 }
 
 void http_server::wakeup(int nloops)

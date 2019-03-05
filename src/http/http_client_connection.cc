@@ -8,24 +8,24 @@
 namespace eve
 {
 
-static void read_timeout_cb()
+static void read_timeout_cb(http_client_connection *conn)
 {
-    // conn->fail(HTTP_TIMEOUT);
+    std::cout << "[client:] " << __func__ << " called\n";
+    conn->fail(HTTP_TIMEOUT);
 }
 
-static void write_timeout_cb()
+static void write_timeout_cb(http_client_connection *conn)
 {
-    // conn->fail(HTTP_TIMEOUT);
+    std::cout << "[client:] " << __func__ << " called\n";
+    conn->fail(HTTP_TIMEOUT);
 }
 
 http_client_connection::http_client_connection(std::shared_ptr<event_base> base, std::shared_ptr<http_client> client)
     : http_connection(base)
 {
     this->client = client;
-    read_timer->set_callback(read_timeout_cb);
-    read_timer->data = (void *)this;
-    write_timer->set_callback(write_timeout_cb);
-    write_timer->data = (void *)this;
+    read_timer->set_callback(read_timeout_cb, this);
+    write_timer->set_callback(write_timeout_cb, this);
 
     this->timeout = client->timeout;
     this->type = CLIENT_CONNECTION;
@@ -38,7 +38,7 @@ http_client_connection::~http_client_connection()
 void http_client_connection::fail(http_connection_error error)
 {
     auto req = requests.front();
-    std::cerr << "[FAIL] " << __func__ << " req->uri=" << req->uri << " with error=" << error << std::endl;
+    std::cerr << "[client:FAIL] " << __func__ << " req->uri=" << req->uri << " with error=" << error << std::endl;
 
     this->requests.pop();
     /* xxx: maybe we should fail all requests??? */

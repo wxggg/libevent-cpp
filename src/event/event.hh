@@ -41,7 +41,6 @@ class event
 	// EvCallback callback;
 	// int res; /* result passed to event callback */
 
-	// Callback *pcb;
 	std::unique_ptr<Callback> pcb;
 
 	short *ev_pncalls; /* allows deletes in callback */
