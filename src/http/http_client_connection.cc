@@ -2,6 +2,7 @@
 #include <http_client.hh>
 #include <util_network.hh>
 #include <util_linux.hh>
+#include <event_base.hh>
 
 #include <cassert>
 
@@ -20,19 +21,12 @@ static void write_timeout_cb(http_client_connection *conn)
     conn->fail(HTTP_TIMEOUT);
 }
 
-http_client_connection::http_client_connection(std::shared_ptr<event_base> base, std::shared_ptr<http_client> client)
-    : http_connection(base)
+http_client_connection::http_client_connection(std::shared_ptr<event_base> base, int fd, std::shared_ptr<http_client> client)
+    : http_connection(base, fd), client(client)
 {
-    this->client = client;
-    read_timer->set_callback(read_timeout_cb, this);
-    write_timer->set_callback(write_timeout_cb, this);
-
+    base->register_callback(readTimer, read_timeout_cb, this);
+    base->register_callback(writeTimer, write_timeout_cb, this);
     this->timeout = client->timeout;
-    this->type = CLIENT_CONNECTION;
-}
-
-http_client_connection::~http_client_connection()
-{
 }
 
 void http_client_connection::fail(http_connection_error error)
@@ -51,12 +45,12 @@ void http_client_connection::fail(http_connection_error error)
         this->connect();
 
     if (req->cb)
-        req->cb(nullptr);
+        req->cb(req);
 }
 
 void http_client_connection::do_read_done()
 {
-    del_read();
+    remove_read_event();
     if (requests.empty())
         return;
 
@@ -69,28 +63,16 @@ void http_client_connection::do_read_done()
     return;
 }
 
-void http_client_connection::do_write_active()
-{
-    // if (check_socket(fd) == -1)
-    // {
-    //     std::cerr << __func__ << " : fixme !!!\n";
-    //     return;
-    // }
-    retry_cnt = 0;
-
-    // dispatch();
-    return;
-}
-
-void http_client_connection::do_write_over()
+void http_client_connection::do_write_done()
 {
     if (requests.empty())
         return;
 
     assert(state == WRITING);
 
-    this->add_read();
-    state = READING_FIRSTLINE;
+    start_read();
+    // add_read_event();
+    // state = READING_FIRSTLINE;
 
     auto req = requests.front();
     req->kind = RESPONSE;
@@ -114,7 +96,7 @@ void http_client_connection::dispatch()
     state = WRITING;
     req->make_header();
 
-    this->add_write();
+    add_write_event();
 }
 
 int http_client_connection::connect()
@@ -124,18 +106,28 @@ int http_client_connection::connect()
 
     reset();
 
-    fd = get_nonblock_socket();
-    if (fd == -1)
-        return -1;
-
-    if (socket_connect(fd, servaddr, servport) == -1)
+    int thefd = fd();
+    if (socket_connect(thefd, servaddr, servport) == -1)
     {
-        closefd(fd);
-        fd = -1;
+        closefd(thefd);
         return -1;
     }
-    add();
+    add_write_event();
     state = CONNECTING;
+    return 0;
+}
+
+int http_client_connection::make_request(std::shared_ptr<http_request> req)
+{
+    req->conn = shared_from_this();
+    req->kind = REQUEST;
+
+    req->remote_host = servaddr;
+    req->remote_port = servport;
+
+    requests.push(req);
+    dispatch();
+
     return 0;
 }
 

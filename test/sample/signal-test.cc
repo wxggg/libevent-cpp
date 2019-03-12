@@ -10,26 +10,19 @@ using namespace eve;
 
 int called = 0;
 
-void signal_cb(signal_event *ev)
+void signal_cb(std::shared_ptr<signal_event> ev)
 {
     cout << "signal call back \n";
-    ev->del();
-}
-
-int testcb(int i, int j)
-{
-    cout << "i=" << i << " j=" << j << endl;
-    return i + j;
+    ev->get_base()->remove_event(ev);
 }
 
 int main(int argc, char const *argv[])
 {
     auto base = std::make_shared<select_base>();
 
-    signal_event ev(base, SIGINT);
-    ev.set_callback(signal_cb, &ev);
-
-    ev.add();
+    auto ev = create_event<signal_event>(base, SIGINT);
+    base->register_callback(ev, signal_cb, ev);
+    base->add_event(ev);
 
     base->loop();
 

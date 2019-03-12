@@ -13,68 +13,112 @@ namespace eve
 
 /** class http_connection **/
 
-http_connection::http_connection(std::shared_ptr<event_base> base)
-    : buffer_event(base)
+http_connection::http_connection(std::shared_ptr<event_base> base, int fd)
+    : buffer_event(base, fd)
 {
     this->state = DISCONNECTED;
-    set_type(RDWR);
 
-    this->set_callback(__http_connection_event_cb, this);
+    register_readcb(handler_read, this);
+    register_eofcb(handler_eof, this);
+    register_writecb(handler_write, this);
+    register_errorcb(handler_error, this);
 
-    this->read_timer = new time_event(base);
-    this->write_timer = new time_event(base);
+    readTimer = create_event<time_event>(base);
+    writeTimer = create_event<time_event>(base);
 }
 
 http_connection::~http_connection()
 {
+    // std::cout << __func__ << std::endl;
     /* notify interested parties that this connection is going down */
-    if (this->fd != -1)
-    {
-        if (this->is_connected() && this->closecb != nullptr)
-            this->closecb(this);
-    }
-    del_read();
-    del_write();
+    // if (this->fd != -1)
+    // {
+    //     if (this->is_connected() && this->closecb != nullptr)
+    //         this->closecb(this);
+    // }
 
-    this->read_timer->del();
-    this->write_timer->del();
-
-    delete read_timer;
-    delete write_timer;
+    // auto base = get_base();
+    // if (base)
+    // {
+    //     base->clean_event(readTimer);
+    //     base->clean_event(writeTimer);
+    // }
 }
 
 void http_connection::reset()
 {
-    if (fd != -1)
+    if (fd() != -1)
     {
-        this->del();
-        /* inform interested parties about connection close */
-        if (is_connected() && closecb != nullptr)
-            closecb(this);
-        closefd(fd);
-        fd = -1;
+        // remove_read_event();
+        // remove_write_event();
+        // remove_read_timer();
+        // remove_write_timer();
+        // /* inform interested parties about connection close */
+        // if (is_connected() && closecb != nullptr)
+        //     closecb(this);
+        // close();
     }
     state = DISCONNECTED;
-    input_buffer->reset();
-    output_buffer->reset();
+    input->reset();
+    output->reset();
+}
+
+void http_connection::start_read()
+{
+    // std::cout << __func__ << " state = " << state << "\n";
+    if (is_closed())
+        return;
+    add_read_event();
+    state = READING_FIRSTLINE;
+    if (timeout > 0)
+    {
+        readTimer->set_timer(timeout, 0);
+        get_base()->add_event(readTimer);
+    }
+}
+
+void http_connection::start_write()
+{
+    // std::cout << __func__ << " state = " << state << "\n";
+    if (is_closed())
+        return;
+    if (get_obuf_length() <= 0)
+        return;
+    add_write_event();
+    state = WRITING;
+    if (timeout > 0)
+    {
+        writeTimer->set_timer(timeout, 0);
+        get_base()->add_event(writeTimer);
+    }
+}
+
+void http_connection::remove_read_timer()
+{
+    get_base()->remove_event(readTimer);
+}
+
+void http_connection::remove_write_timer()
+{
+    get_base()->remove_event(writeTimer);
 }
 
 /** private function **/
 
 void http_connection::read_firstline(std::shared_ptr<http_request> req)
 {
-    enum message_read_status res = req->parse_firstline(input_buffer);
+    enum message_read_status res = req->parse_firstline(input);
     if (res == DATA_CORRUPTED)
     {
         /* Error while reading, terminate */
-        std::cerr << "[connect] " << __func__ << ": bad header lines on" << this->fd << std::endl;
+        std::cerr << "[connect] " << __func__ << ": bad first lines" << std::endl;
         fail(HTTP_INVALID_HEADER);
         return;
     }
     else if (res == MORE_DATA_EXPECTED)
     {
         /* Need more header lines */
-        this->add_read();
+        add_read_event();
         return;
     }
 
@@ -84,17 +128,17 @@ void http_connection::read_firstline(std::shared_ptr<http_request> req)
 
 void http_connection::read_header(std::shared_ptr<http_request> req)
 {
-    enum message_read_status res = req->parse_headers(input_buffer);
+    enum message_read_status res = req->parse_headers(input);
     if (res == DATA_CORRUPTED)
     {
         /* Error while reading, terminate */
-        std::cerr << "[connect] " << __func__ << ": bad header lines on " << fd << std::endl;
+        std::cerr << "[connect] " << __func__ << ": bad header lines" << std::endl;
         fail(HTTP_INVALID_HEADER);
         return;
     }
     else if (res == MORE_DATA_EXPECTED)
     {
-        this->add_read();
+        add_read_event();
         return;
     }
 
@@ -115,13 +159,12 @@ void http_connection::read_header(std::shared_ptr<http_request> req)
         }
         else
         {
-            std::cerr << "[connect] " << __func__ << ": start of read body for " << req->remote_host
-                      << " on " << fd << std::endl;
+            std::cerr << "[connect] " << __func__ << ": start of read body for " << req->remote_host << std::endl;
             get_body(req);
         }
         break;
     default:
-        std::cerr << "[connect] " << __func__ << ": bad header on " << fd << std::endl;
+        std::cerr << "[connect] " << __func__ << ": bad request kind" << std::endl;
         fail(HTTP_INVALID_HEADER);
         break;
     }
@@ -157,7 +200,7 @@ void http_connection::read_body(std::shared_ptr<http_request> req)
 {
     if (req->chunked > 0)
     {
-        switch (req->handle_chunked_read(input_buffer))
+        switch (req->handle_chunked_read(input))
         {
         case ALL_DATA_READ:
             /* finished last chunk */
@@ -177,24 +220,25 @@ void http_connection::read_body(std::shared_ptr<http_request> req)
     else if (req->ntoread < 0)
     {
         /* Read until connection close. */
-        req->input_buffer->push_back_buffer(this->input_buffer, -1);
+        req->input_buffer->push_back_buffer(this->input, -1);
     }
     else if (get_ibuf_length() >= req->ntoread)
     {
         /* Completed content length */
-        req->input_buffer->push_back_buffer(this->input_buffer, (size_t)req->ntoread);
+        req->input_buffer->push_back_buffer(this->input, (size_t)req->ntoread);
         req->ntoread = 0;
         do_read_done();
         return;
     }
 
     /* Read more! */
-    this->add_read();
+    // this->add_read();
+    add_read_event();
 }
 
 void http_connection::read_trailer(std::shared_ptr<http_request> req)
 {
-    switch (req->parse_headers(input_buffer))
+    switch (req->parse_headers(input))
     {
     case DATA_CORRUPTED:
         fail(HTTP_INVALID_HEADER);
@@ -204,7 +248,7 @@ void http_connection::read_trailer(std::shared_ptr<http_request> req)
         break;
     case MORE_DATA_EXPECTED:
     default:
-        this->add_read();
+        add_read_event();
         break;
     }
 }
@@ -217,6 +261,7 @@ void http_connection::read_trailer(std::shared_ptr<http_request> req)
 
 void http_connection::read_http()
 {
+    // std::cout << __func__ << " state = " << state << "\n";
     if (is_closed() || requests.empty())
         return;
     auto req = requests.front();
@@ -239,77 +284,47 @@ void http_connection::read_http()
     case IDLE:
     case WRITING:
     default:
-        std::cerr << "[connect] " << __func__ << " with id=" << id << ": illegal connection state " << state << std::endl;
+        std::cerr << "[connect] " << __func__ << ": illegal connection state " << state << std::endl;
         break;
     }
 }
 
-/** callback for active read or write events
- *  called by event_process()
- */
-void http_connection::__http_connection_event_cb(http_connection *conn)
+void http_connection::handler_read(http_connection *conn)
 {
-    if (conn->is_closed())
-        return;
-    int res = 0;
+    // std::cout << __func__ << " state = " << conn->state << "\n";
+    conn->remove_read_timer();
+    conn->read_http();
+}
 
-    if (conn->is_read_active())
-    {
-        res = conn->read_in();
-        if (res > 0)
-        {
-            conn->add_read();
-            conn->read_http();
-        }
-        else
-        {
-            if (res == 0)
-            {
-                conn->do_read_done();
-                return;
-            }
-            if (res == -1)
-            {
-                if (errno == EAGAIN || errno == EINTR)
-                    conn->add_read();
-                else
-                    conn->fail(HTTP_EOF);
-                return;
-            }
-        }
-    }
+void http_connection::handler_eof(http_connection *conn)
+{
+    // std::cout << __func__ << " state = " << conn->state << "\n";
+    if (conn->get_obuf_length() > 0)
+        conn->start_write();
+    else
+        conn->close();
+}
 
-    if (conn->is_write_active())
+void http_connection::handler_write(http_connection *conn)
+{
+    // std::cout << __func__ << " state = " << conn->state << "\n";
+    conn->remove_write_timer();
+    if (conn->get_obuf_length() > 0)
     {
-        conn->do_write_active();
-        if (conn->get_obuf_length() > 0)
-        {
-            res = conn->write_out();
-            if (res > 0)
-            {
-                if (conn->get_obuf_length() > 0)
-                    conn->add_write();
-                else
-                    conn->do_write_over();
-            }
-            else
-            {
-                if (res == 0)
-                {
-                    conn->fail(HTTP_EOF);
-                    return;
-                }
-                if (res == -1)
-                {
-                    if (errno == EAGAIN || errno == EINTR || errno == EINPROGRESS)
-                        conn->add_write();
-                    else
-                        conn->fail(HTTP_EOF);
-                    return;
-                }
-            }
-        }
+        conn->add_write_event();
     }
+    else
+    {
+        conn->remove_write_event();
+        conn->do_write_done();
+    }
+}
+
+void http_connection::handler_error(http_connection *conn)
+{
+    std::cout << __func__ << " state = " << conn->state << "\n";
+    std::cerr << "[HTTP] error read/write with EOF\n";
+    // conn->fail(HTTP_EOF);
 }
 
 } // namespace eve

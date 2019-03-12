@@ -17,16 +17,14 @@ void home(shared_ptr<http_request> req)
     req->send_reply(HTTP_OK, "Everything is fine", req->input_headers["Empty"].empty() ? buf : nullptr);
 }
 
+
 int main(int argc, char const *argv[])
 {
-    auto base = make_shared<epoll_base>();
-    auto server = make_shared<http_server>(base);
+    auto server = make_shared<http_server>();
 
-    server->set_handle_cb("/", home);
-    server->start("localhost", 8080);
+    server->set_handle_cb("/test", home);
+    server->resize_thread_pool(1);
+    server->start("localhost", 8088);
 
-    server->resize_thread_pool(8);
-
-    base->loop();
     return 0;
 }

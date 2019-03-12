@@ -91,7 +91,7 @@ class time_event : public event
 ```c++
 void timeout_cb(short event, void *arg)
 {
-	time_event *timeout = (time_event *)arg;
+	std::shared_ptr<time_event>timeout = (std::shared_ptr<time_event>)arg;
 	int newtime = time(nullptr);
 
 	cout << __func__ << ": called at " << newtime << endl;
@@ -133,15 +133,15 @@ void time_event::set_timer(int nsec)
 ```c++
 struct cmp_timeev
 {
-    bool operator()(time_event *const &lhs, time_event *const &rhs) const;
+    bool operator()(std::shared_ptr<time_event>const &lhs, std::shared_ptr<time_event>const &rhs) const;
 };
 
 class event_base
 {
-    std::set<time_event *, cmp_timeev> timeevset;
+    std::set<std::shared_ptr<time_event>, cmp_timeev> timeevset;
 };
 
-bool cmp_timeev::operator()(time_event *const &lhs, time_event *const &rhs) const
+bool cmp_timeev::operator()(std::shared_ptr<time_event>const &lhs, std::shared_ptr<time_event>const &rhs) const
 {
 	return timercmp(&lhs->timeout, &rhs->timeout, <);
 }
@@ -163,7 +163,7 @@ while (!done)
         res = this->dispatch(nullptr);
     }
     else {
-        time_event *timeev = *timeevset.begin();
+        std::shared_ptr<time_event>timeev = *timeevset.begin();
         /** judge if all timeout > now, if not then 
          *  means have some active timeout event need to be 
          *  processed, so do not dispatch, because dispatch 
@@ -200,8 +200,8 @@ void event_base::timeout_process()
 	struct timeval now;
 	gettimeofday(&now, nullptr);
 
-	time_event *ev;
-	std::set<time_event *, cmp_timeev>::iterator i = timeevset.begin();
+	std::shared_ptr<time_event> ev;
+	std::set<std::shared_ptr<time_event>, cmp_timeev>::iterator i = timeevset.begin();
 	while (i != timeevset.end())
 	{
 		ev = *i;

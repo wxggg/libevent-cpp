@@ -1,5 +1,5 @@
-#include "event.hh"
-#include "event_base.hh"
+#include <event.hh>
+#include <event_base.hh>
 
 #include <assert.h>
 #include <iostream>
@@ -19,30 +19,22 @@ event::event(std::shared_ptr<event_base> base)
 {
 	set_base(base);
 	id = _internal_event_id++;
-
-	set_callback(default_callback, this);
 }
 
 void event::set_base(std::shared_ptr<event_base> base)
 {
 	this->base = base;
-	this->pri = base->activequeues.size() / 2;
+	this->pri = base->active_queue_size() / 2;
 }
+
 
 void event::set_priority(int pri)
 {
 	if (is_active())
 		return;
-	if (pri < 0 || pri >= static_cast<int>(this->base->activequeues.size()))
+	if (pri < 0 || pri >= get_base()->active_queue_size())
 		return;
 	this->pri = pri;
-}
-
-void event::activate(short ncalls)
-{
-	this->ncalls = ncalls;
-	this->base->activequeues[this->pri].push_back(this);
-	set_active();
 }
 
 } // namespace eve

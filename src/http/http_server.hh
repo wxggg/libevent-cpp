@@ -2,6 +2,7 @@
 #include <thread_pool.hh>
 #include <epoll_base.hh>
 #include <lock_queue.hh>
+#include <http_server_thread.hh>
 
 #include <list>
 #include <string>
@@ -32,18 +33,17 @@ class http_server : public std::enable_shared_from_this<http_server>
 {
   private:
 	std::shared_ptr<thread_pool> pool = nullptr;
-	std::vector<std::shared_ptr<event_base>> poolBases;
-	std::vector<int> wakefds;
+	std::shared_ptr<event_base> base = nullptr;
+	std::vector<std::shared_ptr<http_server_thread>> threads;
 
   public:
-	std::shared_ptr<event_base> base = nullptr;
 	int timeout = -1;
+
+	lock_queue<std::shared_ptr<http_client_info>> clientQueue;
 
 	std::function<void(std::shared_ptr<http_request>)> gencb = nullptr;
 
-	std::list<rw_event *> sockets;
 	std::map<std::string, HandleCallBack> handle_callbacks;
-	lock_queue<std::shared_ptr<http_client_info>> clientQueue;
 
 	std::string address;
 	int port;
@@ -51,11 +51,10 @@ class http_server : public std::enable_shared_from_this<http_server>
 	std::mutex mutex;
 
   public:
-	http_server(std::shared_ptr<event_base> base)
+	http_server()
 	{
-		this->base = base;
+		base = std::make_shared<epoll_base>();
 		pool = std::make_shared<thread_pool>();
-		resize_thread_pool(4); // default 4 threads
 	}
 	~http_server();
 
@@ -67,14 +66,24 @@ class http_server : public std::enable_shared_from_this<http_server>
 		handle_callbacks[what] = cb;
 	}
 
-	void set_loops();
 
 	inline void set_timeout(int sec) { timeout = sec; }
 
 	int start(const std::string &address, unsigned short port);
 
 	void clean_connections();
-	void wakeup(int nloops); // wakeup the ith thread in pool
+	void wakeup(int i); // wakeup the ith thread in pool
+	void wakeup_random(int n)
+	{
+		for (int i = 0; i < n; i++)
+			wakeup(rand() % static_cast<int>(threads.size()));
+	}
+
+	void wakeup_all()
+	{
+		for (int i = 0; i < static_cast<int>(threads.size()); i++)
+			wakeup(i);
+	}
 
   private:
 };

@@ -22,8 +22,8 @@ class select_base : public event_base
 	select_base();
 	~select_base();
 
-	int add(rw_event *ev) override;
-	int del(rw_event *ev) override;
+	int add(std::shared_ptr<rw_event> ev) override;
+	int del(std::shared_ptr<rw_event> ev) override;
 	int recalc() override;
 	int dispatch(struct timeval *tv) override;
 

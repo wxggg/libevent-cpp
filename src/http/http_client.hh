@@ -1,4 +1,5 @@
 #include <http_client_connection.hh>
+#include <event_base.hh>
 
 #include <string>
 #include <memory>
@@ -10,21 +11,17 @@ class http_client : public std::enable_shared_from_this<http_client>
 {
 public:
   int timeout = -1;
-  std::shared_ptr<event_base> base;
-  std::map<int, std::shared_ptr<http_client_connection>> connections; // map id and connection
+  std::shared_ptr<event_base> base = nullptr;
 
 public:
-  http_client(std::shared_ptr<event_base> base);
-  ~http_client();
+  http_client();
+  ~http_client() {}
 
   inline void set_timeout(int sec) { timeout = sec; }
 
-  /** return id of connection from 0 1 2...
-     *  error if return -1 */
-  int make_connection(const std::string &address, unsigned int port);
-  inline std::shared_ptr<http_client_connection> get_connection(int connid) { return connections[connid]; }
+  std::shared_ptr<http_client_connection> make_connection(const std::string &address, unsigned int port);
 
-  int make_request(int connid, std::shared_ptr<http_request> req);
+  void run();
 };
 
 } // namespace eve

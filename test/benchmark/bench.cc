@@ -12,73 +12,61 @@
 using namespace std;
 using namespace eve;
 
-static int count, writes, fired;
-
 static int num_pipes, num_active, num_writes;
 
 static int *pipes;
-static vector<rw_event *> vecrw;
+vector<std::shared_ptr<rw_event>> vecrw;
 
 std::shared_ptr<event_base> pbase;
 
-void read_cb(int fd, int idx)
+void read_cb(int fd, int idx, int *count, int *writes, int *fired)
 {
+    // cout << "read_cb fd=" << fd << " count=" << *count << " writes=" << *writes << " fired=" << *fired << endl;
     int widx = idx + 1;
-    // cout << "idx=" << idx;
     u_char ch;
 
-    count += read(fd, &ch, sizeof(ch));
-    if (writes)
+    (*count) += read(fd, &ch, sizeof(ch));
+    if (*writes)
     {
         if (widx >= num_pipes)
             widx -= num_pipes;
         write(pipes[2 * widx + 1], "e", 1);
-        writes--;
-        fired++;
+        (*writes)--;
+        (*fired)++;
     }
-    // cout << " count=" << count << " writes=" << writes << " fired=" << fired << endl
-    //      << endl;
 }
 
 struct timeval *
 run_once(void)
 {
-    rw_event *ev;
+    static int count = 0, fired = 0;
+    int writes = num_writes;
     for (int *cp = pipes, i = 0; i < num_pipes; i++, cp += 2)
     {
-        ev = vecrw[i];
-        ev->del();
+        auto ev = vecrw[i];
+        pbase->remove_event(ev);
+        ev->enable_read();
         ev->set_fd(cp[0]);
-        ev->set_callback(read_cb, ev->fd, i);
         ev->set_persistent();
-        ev->add();
+        pbase->register_callback(ev, read_cb, ev->fd, i, &count, &writes, &fired);
+        pbase->add_event(ev);
     }
-    pbase->set_loop_nonblock_and_once();
-    pbase->loop();
-    pbase->clear_loop_nonblock();
-
-    fired = 0;
+    pbase->loop_nonblock_and_once();
 
     int space = num_pipes / num_active;
     space *= 2;
     for (int i = 0; i < num_active; i++, fired++)
         write(pipes[i * space + 1], "e", 1);
 
-    count = 0;
-    writes = num_writes;
-
     static struct timeval ts, te;
     int xcount = 0;
     gettimeofday(&ts, nullptr);
-    pbase->set_loop_nonblock_and_once();
     do
     {
-        pbase->loop();
+        pbase->loop_nonblock_and_once();
         xcount++;
-        cout << "xcount=" << xcount << " count=" << count << " fired=" << fired << "--------------" << endl
-             << endl;
+        // this_thread::sleep_for(chrono::milliseconds(10));
     } while (count != fired);
-    pbase->clear_loop_nonblock();
     gettimeofday(&te, nullptr);
 
     if (xcount != count)
@@ -116,13 +104,6 @@ int main(int argc, char *const argv[])
         }
     }
 
-    cout << "num_pipes:" << num_pipes << " active:" << num_active << " nwrites:" << num_writes << endl;
-
-    if (num_active < 2)
-    {
-        cerr << "err num_active should not be less then 2\n";
-        exit(-1);
-    }
     struct rlimit rl;
     rl.rlim_cur = rl.rlim_max = num_pipes * 2 + 50;
     if (setrlimit(RLIMIT_NOFILE, &rl) == -1)
@@ -132,15 +113,14 @@ int main(int argc, char *const argv[])
     }
 
     pbase = std::make_shared<epoll_base>();
-    // pbase = new select_base(); // max file descriptor is limited
-    // pbase = new poll_base();
+    // pbase = std::make_shared<select_base>(); // max file descriptor is limited
+    // pbase = std::make_shared<poll_base>();
+
     pbase->priority_init(1);
 
     vecrw.resize(num_pipes);
     for (int i = 0; i < num_pipes; i++)
-    {
-        vecrw[i] = new rw_event(pbase, -1, READ);
-    }
+        vecrw[i] = create_event<rw_event>(pbase, -1, READ);
     pipes = new int[num_pipes * 2];
     cout << "memory alloc finished\n";
 
@@ -148,7 +128,7 @@ int main(int argc, char *const argv[])
     {
         if (pipe(cp) == -1)
         {
-            cerr << "pipe\n";
+            cerr << "error pipe errno=" << errno << endl;
             exit(-1);
         }
     }
@@ -162,8 +142,10 @@ int main(int argc, char *const argv[])
         tv = run_once();
         if (!tv)
             exit(1);
-        cout << "测试时间：" << (tv->tv_sec * 1000000L + tv->tv_usec) / 1000 << "ms" << endl;
+        cout << "测试时间：" << (tv->tv_sec * 1000000L + tv->tv_usec)<< " microseconds" << endl;
     }
+
+    delete[] pipes;
 
     return 0;
 }

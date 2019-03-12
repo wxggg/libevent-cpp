@@ -14,7 +14,8 @@ namespace eve
 {
 
 /** class http_request **/
-http_request::http_request()
+http_request::http_request(std::shared_ptr<http_connection> conn)
+    : conn(conn)
 {
     this->kind = RESPONSE; // defualt is RESPONSE
 
@@ -24,15 +25,15 @@ http_request::http_request()
 
 http_request::~http_request()
 {
+    // std::cout << __func__ << std::endl;
 }
 
 std::shared_ptr<event_base> http_request::get_base()
 {
-    if (!conn) 
-    {
-        std::cerr<<"[ERROR] req->conn is nullptr\n";
-    }
-    return conn->base;
+    auto c = conn.lock();
+    if (c)
+        return c->get_base();
+    return nullptr;
 }
 
 void http_request::send_error(int error, std::string reason)
@@ -103,7 +104,7 @@ void http_request::send_reply_start(int code, const std::string &reason)
         chunked = 1;
     }
     make_header();
-    conn->start_write();
+    get_connection()->start_write();
 }
 
 void http_request::send_reply_chunk(std::shared_ptr<buffer> buf)
@@ -113,21 +114,21 @@ void http_request::send_reply_chunk(std::shared_ptr<buffer> buf)
     {
         std::stringstream ss;
         ss << std::hex << buf->get_length();
-        conn->output_buffer->push_back_string(ss.str() + "\r\n");
+        get_connection()->write_string(ss.str() + "\r\n");
     }
-    conn->output_buffer->push_back_buffer(buf, buf->get_length());
+    get_connection()->write_buffer(buf);
     if (chunked)
-        conn->output_buffer->push_back_string("\r\n");
+        get_connection()->write_string("\r\n");
 
-    conn->start_write();
+    get_connection()->start_write();
 }
 
 void http_request::send_reply_end()
 {
     if (chunked)
     {
-        conn->output_buffer->push_back_string("0\r\n\r\n");
-        conn->start_write();
+        get_connection()->write_string("0\r\n\r\n");
+        get_connection()->start_write();
         chunked = 0;
     }
 }
@@ -271,9 +272,9 @@ void http_request::make_header()
         __make_header_response();
 
     for (const auto &kv : output_headers)
-        conn->output_buffer->push_back_string(kv.first + ": " + kv.second + "\r\n");
+        get_connection()->write_string(kv.first + ": " + kv.second + "\r\n");
 
-    conn->output_buffer->push_back_string("\r\n");
+    get_connection()->write_string("\r\n");
 
     if (this->output_buffer->get_length() > 0)
     {
@@ -281,7 +282,7 @@ void http_request::make_header()
 		 * For a request, we add the POST data, for a reply, this
 		 * is the regular data.
 		 */
-        conn->output_buffer->push_back_buffer(this->output_buffer, -1);
+        get_connection()->write_buffer(output_buffer);
     }
 }
 
@@ -294,7 +295,7 @@ void http_request::__send(std::shared_ptr<buffer> databuf)
     /* Adds headers to the response */
     make_header();
 
-    conn->start_write();
+    get_connection()->start_write();
 }
 
 /**
@@ -399,7 +400,7 @@ void http_request::__make_header_request()
     }
 
     std::string str = method + " " + uri + " HTTP/" + std::to_string(major) + "." + std::to_string(minor) + "\r\n";
-    conn->output_buffer->push_back_string(str);
+    get_connection()->write_string(str);
 
     /* Add the content length on a post request if missing */
     if (type == REQ_POST && output_headers["Content-Length"].empty())
@@ -413,7 +414,7 @@ void http_request::__make_header_response()
 {
     int is_keepalive = is_connection_keepalive();
     std::string s = "HTTP/" + std::to_string(major) + "." + std::to_string(minor) + " " + std::to_string(response_code) + " " + response_code_line + "\r\n";
-    conn->output_buffer->push_back_string(s);
+    get_connection()->write_string(s);
 
     if (major == 1)
     {

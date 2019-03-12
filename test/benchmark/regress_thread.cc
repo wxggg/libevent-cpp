@@ -57,7 +57,7 @@ void ugu(int id, Third &t)
 int main(int argc, char const *argv[])
 {
     thread_pool pool(8);
-    for(int i=0; i<1000000;i++)
+    for(int i=0; i<10000;i++)
     {
         pool.push(first, i);
     }

@@ -13,7 +13,7 @@
 using namespace std;
 using namespace eve;
 
-void fifo_read(rw_event *ev)
+void fifo_read(std::shared_ptr<rw_event> ev)
 {
     char buf[255];
     int len = read(ev->fd, buf, sizeof(buf) - 1);
@@ -31,18 +31,17 @@ void fifo_read(rw_event *ev)
     cout << buf << endl;
 }
 
-void signal_int(signal_event *ev)
+void signal_int(std::shared_ptr<signal_event> ev)
 {
-    cout<<"signal event "<<ev->sig<<" called back"<<endl;
+    cout << "signal event " << ev->sig << " called back" << endl;
     exit(-1);
 }
 
 int main(int argc, char const *argv[])
 {
-    // select_base base;
+    // auto base = std::make_shared<select_base>();
     auto base = std::make_shared<epoll_base>();
-    // epoll_base base;
-
+    // auto base = std::make_shared<epoll_base>();
 
     const char *fifo = "/tmp/event.fifo";
 
@@ -62,13 +61,13 @@ int main(int argc, char const *argv[])
         exit(1);
     }
 
-    rw_event evfifo(base, socket, READ);
-    evfifo.set_callback(fifo_read, &evfifo);
-    evfifo.add();
+    auto evfifo = create_event<rw_event>(base, socket, READ);
+    base->register_callback(evfifo, fifo_read, evfifo);
+    base->add_event(evfifo);
 
-    signal_event evsigint(base, SIGINT);
-    evsigint.set_callback(signal_int, &evsigint);
-    // evsigint.add();
+    auto evsigint = create_event<signal_event>(base, SIGINT);
+    base->register_callback(evsigint, signal_int, evsigint);
+    //add
 
     base->loop();
 

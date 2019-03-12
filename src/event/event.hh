@@ -34,20 +34,9 @@ class event
 
   public:
 	int id;
-	std::shared_ptr<event_base> base;
+	std::weak_ptr<event_base> base;
 	short ncalls = 0;
 	int pri; /* smaller numbers means higher priority */
-
-	// EvCallback callback;
-	// int res; /* result passed to event callback */
-
-	std::unique_ptr<Callback> pcb;
-
-	short *ev_pncalls; /* allows deletes in callback */
-
-	void *data; /* can be used to store anything */
-
-	std::shared_ptr<void> ptr; /* used to store smart pointer */
 
 	int err = -1;
 
@@ -56,8 +45,17 @@ class event
 	event(std::shared_ptr<event_base> base);
 	virtual ~event() {}
 
+	virtual void init(std::shared_ptr<event>) {}
+
 	void set_base(std::shared_ptr<event_base> base);
 
+	decltype(auto) get_base()
+	{
+		auto b = base.lock();
+		if (!b)
+			std::cerr << "error base is expired\n";
+		return b;
+	}
 
 	inline void set_active() { _active = true; }
 	inline void clear_active() { _active = false; }
@@ -67,23 +65,15 @@ class event
 	inline void clear_persistent() { _persistent = false; }
 	inline bool is_persistent() const { return _persistent; }
 
-	virtual int add() = 0;
-	virtual int del() = 0;
-
 	void set_priority(int pri);
-	void activate(short ncalls);
-
-	static void default_callback(event *ev)
-	{
-		std::cerr << "warning: event id=" << ev->id << " called default callback\n";
-	}
-
-	template <typename F, typename... Rest>
-	decltype(auto) set_callback(F &&f, Rest &&... rest)
-	{
-		auto tsk = std::bind(std::forward<F>(f), std::forward<Rest>(rest)...);
-		this->pcb = std::make_unique<Callback>([tsk]() { tsk(); });
-	}
 };
+
+template <typename T, typename... Rest>
+decltype(auto) create_event(Rest &&... rest)
+{
+	auto ev = std::make_shared<T>(std::forward<Rest>(rest)...);
+	ev->init(ev);
+	return ev;
+}
 
 } // namespace eve

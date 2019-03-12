@@ -1,50 +1,32 @@
 #include <http_client.hh>
+#include <util_network.hh>
+#include <epoll_base.hh>
+
 #include <cassert>
 
 namespace eve
 {
-
-http_client::http_client(std::shared_ptr<event_base>base)
+http_client::http_client()
 {
-    this->base = base;
+    base = std::make_shared<epoll_base>();
 }
 
-http_client::~http_client()
+std::shared_ptr<http_client_connection> http_client::make_connection(const std::string &address, unsigned int port)
 {
-}
+    int fd = get_nonblock_socket();
 
-int http_client::make_connection(const std::string &address, unsigned int port)
-{
-    auto conn = std::make_shared<http_client_connection>(base, shared_from_this());
+    auto conn = std::make_shared<http_client_connection>(base, fd, shared_from_this());
     conn->servaddr = address;
     conn->servport = port;
 
     if (conn->connect() == -1)
-        return -1;
-    connections[conn->id] = conn;
-    return conn->id;
+        return nullptr;
+    return conn;
 }
 
-int http_client::make_request(int connid, std::shared_ptr<http_request> req)
+void http_client::run()
 {
-    if (connections.count(connid) <= 0)
-    {
-        std::cerr << __func__ << ":no connections in client with id=" << connid << std::endl;
-        return -1;
-    }
-
-    auto conn = connections.at(connid);
-
-    req->kind = REQUEST;
-    req->conn = conn.get();
-
-    req->remote_host = conn->servaddr;
-    req->remote_port = conn->servport;
-
-    conn->requests.push(req);
-    conn->dispatch();
-
-    return 0;
+    base->loop();
 }
 
 } // namespace eve

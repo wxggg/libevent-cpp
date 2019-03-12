@@ -16,7 +16,7 @@ using namespace eve;
 int fdpair[2];
 int called = 0;
 
-void write_cb(rw_event *ev)
+void write_cb(std::shared_ptr<rw_event> ev)
 {
     cout << __func__ << " called\n";
     const char *test = "test string";
@@ -26,7 +26,10 @@ void write_cb(rw_event *ev)
     if (len > 0)
     {
         if (!called)
-            ev->add();
+        {
+            ev->enable_write();
+            ev->get_base()->add_event(ev);
+        }
         close(fdpair[0]);
     }
     else if (called == 1)
@@ -46,9 +49,9 @@ int main(int argc, char const *argv[])
 
     auto base = std::make_shared<poll_base>();
 
-    rw_event ev(base, fdpair[1], WRITE);
-    ev.set_callback(write_cb, &ev);
-    ev.add();
+    auto ev = create_event<rw_event>(base, fdpair[1], WRITE);
+    base->register_callback(ev, write_cb, ev);
+    base->add_event(ev);
 
     base->loop();
 

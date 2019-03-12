@@ -55,11 +55,10 @@ int epoll_base::dispatch(struct timeval *tv)
 		evsignal_process();
 
 	int what = 0;
-	rw_event *ev;
 	for (int i = 0; i < res; i++)
 	{
 		what = _epevents[i].events;
-		ev = (rw_event *)_epevents[i].data.ptr;
+		auto ev = fdMapRw.at(_epevents[i].data.fd);
 		if (what & (EPOLLHUP | EPOLLERR))
 			what |= (EPOLLIN | EPOLLOUT);
 
@@ -67,84 +66,77 @@ int epoll_base::dispatch(struct timeval *tv)
 		{
 			ev->clear_active();
 			if ((what & EPOLLIN) && ev->is_readable())
-				ev->activate_read();
-			if ((what & EPOLLOUT) && ev->is_writable())
-				ev->activate_write();
+				ev->set_active_read();
+			if ((what & EPOLLOUT) && ev->is_writeable())
+				ev->set_active_write();
 
 			if (ev->is_read_active() || ev->is_write_active())
-				ev->activate(1);
+			{
+				if (!ev->is_persistent())
+					remove_event(ev);
+				activate(ev, 1);
+			}
 		}
 	}
 	return 0;
 }
 
-int epoll_base::add(rw_event *ev)
+int epoll_base::add(std::shared_ptr<rw_event> ev)
 {
 	struct epoll_event epev = {0, {0}};
-	epev.data.ptr = ev;
+	epev.data.fd = ev->fd;
 	int op = EPOLL_CTL_ADD;
-
-	if (ev->is_read_available() || ev->epoll_in)
-		epev.events |= EPOLLIN;
-	if (ev->is_write_available() || ev->epoll_out)
-		epev.events |= EPOLLOUT;
-
-	if (!ev->is_read_write())
-		return epoll_ctl(_epfd, op, ev->fd, &epev);
 
 	if (ev->epoll_in || ev->epoll_out)
 		op = EPOLL_CTL_MOD;
 
-	if (epev.events & EPOLLIN)
-		ev->epoll_in = true;
-	if (epev.events & EPOLLOUT)
-		ev->epoll_out = true;
+	if (ev->epoll_in || ev->is_readable())
+		epev.events |= EPOLLIN;
+	if (ev->epoll_out || ev->is_writeable())
+		epev.events |= EPOLLOUT;
 
 	if (epoll_ctl(_epfd, op, ev->fd, &epev) == -1)
 		return -1;
+
+	ev->epoll_in |= ev->is_readable();
+	ev->epoll_out |= ev->is_writeable();
 	return 0;
 }
 
-int epoll_base::del(rw_event *ev)
+int epoll_base::del(std::shared_ptr<rw_event> ev)
 {
 	struct epoll_event epev = {0, {0}};
-	epev.data.ptr = ev;
-	int events = 0;
+	epev.data.fd = ev->fd;
+
+	bool writedelete = true, readdelete = true;
+
 	int op = EPOLL_CTL_DEL;
 
-	if (!ev->is_read_available())
+	int events = 0;
+
+	if (!ev->is_readable())
 		events |= EPOLLIN;
-	if (!ev->is_write_available())
+	if (!ev->is_writeable())
 		events |= EPOLLOUT;
 
-	if (!ev->is_read_write())
-		return epoll_ctl(_epfd, op, ev->fd, &epev);
-
-	if ((events & (EPOLLIN | EPOLLOUT)) != (EPOLLIN | EPOLLOUT))
+	if ((events & (EPOLLIN | EPOLLOUT)) != (EPOLLIN | EPOLLOUT)) 
 	{
-		if ((events & EPOLLIN) && ev->epoll_out)
-		{
+		if ((events & EPOLLIN) && ev->epoll_out) {
+			writedelete = false;
 			events = EPOLLOUT;
 			op = EPOLL_CTL_MOD;
-			ev->epoll_out = false;
 		}
-		else if ((events & EPOLLOUT) && ev->epoll_in)
-		{
+		else if ((events & EPOLLOUT) && ev->epoll_in) {
+			readdelete = false;
 			events = EPOLLIN;
 			op = EPOLL_CTL_MOD;
-			ev->epoll_in = false;
 		}
 	}
-
-	if (op == EPOLL_CTL_DEL)
-	{
-		if (events & EPOLLIN)
-			ev->epoll_in = false;
-		if (events & EPOLLOUT)
-			ev->epoll_out = false;
-	}
-
+	
 	epev.events = events;
+
+	if (writedelete) ev->epoll_out = false;
+	if (readdelete) ev->epoll_in = false;
 
 	if (epoll_ctl(_epfd, op, ev->fd, &epev) == -1)
 		return -1;

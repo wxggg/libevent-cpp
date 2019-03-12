@@ -6,14 +6,14 @@
 using namespace std;
 using namespace eve;
 
-void timeout_cb(time_event *ev)
+void timeout_cb(std::shared_ptr<time_event> ev)
 {
 	int newtime = time(nullptr);
 
 	cout << __func__ << ": called at " << newtime << endl;
 
 	ev->set_timer(3, 0);
-	ev->add();
+	ev->get_base()->add_event(ev);
 }
 
 
@@ -21,12 +21,11 @@ int main(int argc, char **argv)
 {
 	// select_base base;
 	auto base = std::make_shared<select_base>();
-	// poll_base base;
 
-	time_event timeout(base);
-	timeout.set_callback(timeout_cb, &timeout);
-	timeout.set_timer(5, 0);
-	timeout.add();
+	auto ev = create_event<time_event>(base);
+	base->register_callback(ev, timeout_cb, ev);
+	ev->set_timer(5, 0);
+	base->add_event(ev);
 
 	base->loop();
 }

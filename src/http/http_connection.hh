@@ -9,9 +9,11 @@
 #include <string>
 #include <memory>
 #include <functional>
+#include <mutex>
 
 namespace eve
 {
+using Lock = std::unique_lock<std::mutex>;
 
 enum http_connection_error
 {
@@ -34,34 +36,25 @@ enum http_connection_state
 	CLOSED			   /**< connection closed > */
 };
 
-enum http_connection_type
-{
-	SERVER_CONNECTION,
-	CLIENT_CONNECTION
-};
-
 class http_connection : public buffer_event
 {
-  public:
+  protected:
 	int timeout = -1;
-	enum http_connection_state state;
-	enum http_connection_type type;
 
 	std::queue<std::shared_ptr<http_request>> requests;
 
-	time_event *read_timer = nullptr;
-	time_event *write_timer = nullptr;
+	std::shared_ptr<time_event> readTimer = nullptr;
+	std::shared_ptr<time_event> writeTimer = nullptr;
 
 	std::function<void(http_connection *)> closecb = nullptr;
 	std::function<void(http_connection *)> connectioncb = nullptr;
 
-  public:
-	http_connection(){}
-	http_connection(std::shared_ptr<event_base>base);
-	virtual ~http_connection();
+	std::mutex mutex;
 
-	inline bool is_server_connection() const { return type == SERVER_CONNECTION; }
-	inline bool is_client_connection() const { return type == CLIENT_CONNECTION; }
+  public:
+	enum http_connection_state state;
+	http_connection(std::shared_ptr<event_base> base, int fd);
+	virtual ~http_connection();
 
 	inline int is_connected() const
 	{
@@ -84,42 +77,31 @@ class http_connection : public buffer_event
 
 	virtual void fail(enum http_connection_error error) = 0;
 
-	inline void close()
+	void close()
 	{
-		closefd(fd); // close tcp connecton
+		if (get_obuf_length() > 0)
+		{
+			start_write();
+			return;
+		}
+		clean_event();
+		closefd(fd());
+		set_fd(-1);
 		state = CLOSED;
-		del();
 	}
-	inline bool is_closed() const { return state == CLOSED; }
+	inline bool is_closed()
+	{
+		return state == CLOSED;
+	}
 
 	virtual void do_read_done() = 0;
-	virtual void do_write_active() = 0;
-	virtual void do_write_over() = 0;
+	virtual void do_write_done() = 0;
 
-	inline void start_read()
-	{
-		if (is_closed())
-			return;
-		this->add_read();
-		state = READING_FIRSTLINE;
-		if (timeout > 0)
-		{
-			read_timer->set_timer(timeout, 0);
-			read_timer->add();
-		}
-	}
-	inline void start_write()
-	{
-		if (is_closed())
-			return;
-		this->add_write();
-		state = WRITING;
-		if (timeout > 0)
-		{
-			write_timer->set_timer(timeout, 0);
-			write_timer->add();
-		}
-	}
+	void start_read();
+	void start_write();
+
+	void remove_read_timer();
+	void remove_write_timer();
 
   protected:
 	void read_http();
@@ -130,7 +112,10 @@ class http_connection : public buffer_event
 	void read_trailer(std::shared_ptr<http_request> req);
 
   private:
-	static void __http_connection_event_cb(http_connection *conn);
+	static void handler_read(http_connection *conn);
+	static void handler_eof(http_connection *conn);
+	static void handler_write(http_connection *conn);
+	static void handler_error(http_connection *conn);
 };
 
 } // namespace eve

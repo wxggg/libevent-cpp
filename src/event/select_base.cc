@@ -24,6 +24,7 @@ select_base::select_base()
 
 select_base::~select_base()
 {
+    std::cout<<"~select_base\n";
     free(event_readset_in);
     free(event_writeset_in);
     free(event_readset_out);
@@ -34,7 +35,7 @@ void select_base::check_fdset()
 {
     bool iread = false, iwrite = false;
 
-    for (auto kv : fd_map_rw)
+    for (auto kv : fdMapRw)
     {
         // std::cout << "kv:" << kv.first << " " << kv.second << std::endl;
         iread = false, iwrite = false;
@@ -56,7 +57,7 @@ void select_base::check_fdset()
         if (iread)
             assert(kv.second->is_readable());
         if (iwrite)
-            assert(kv.second->is_writable());
+            assert(kv.second->is_writeable());
     }
 }
 
@@ -75,7 +76,7 @@ int select_base::dispatch(struct timeval *tv)
 
     if (evsignal_deliver() == -1)
     {
-        std::cout << "evsig->deliver() error\n";
+        std::cerr << "evsig->deliver() error\n";
         return -1;
     }
 
@@ -101,15 +102,13 @@ int select_base::dispatch(struct timeval *tv)
     }
     else if (caught)
     {
-        std::cout << "evsignal caught=1" << std::endl;
+        std::cerr << "evsignal caught=1" << std::endl;
         evsignal_process();
     }
 
     // check_fdset();
     bool iread, iwrite;
-    rw_event *ev;
-
-    for (auto kv : fd_map_rw)
+    for (auto kv : fdMapRw)
     {
         iread = iwrite = false;
         if (FD_ISSET(kv.first, event_readset_out))
@@ -119,18 +118,18 @@ int select_base::dispatch(struct timeval *tv)
 
         if ((iread || iwrite) && kv.second)
         {
-            ev = kv.second;
+            auto ev = kv.second;
             ev->clear_active();
             if (iread && ev->is_readable())
-                ev->activate_read();
-            if (iwrite && ev->is_writable())
-                ev->activate_write();
+                ev->set_active_read();
+            if (iwrite && ev->is_writeable())
+                ev->set_active_write();
 
             if (ev->is_read_active() || ev->is_write_active())
             {
                 if (!ev->is_persistent())
-                    ev->del();
-                ev->activate(1);
+                    remove_event(ev);
+                activate(ev, 1);
             }
         }
     }
@@ -168,7 +167,7 @@ int select_base::resize(int fdsz)
     return 0;
 }
 
-int select_base::add(rw_event *ev)
+int select_base::add(std::shared_ptr<rw_event> ev)
 {
     if (ev->fd > MAX_SELECT_FD)
     {
@@ -195,28 +194,22 @@ int select_base::add(rw_event *ev)
             this->resize(fdsz);
     }
 
-    if (ev->is_read_available())
-    {
+    if (ev->is_readable())
         FD_SET(ev->fd, event_readset_in);
-        this->fd_map_rw[ev->fd] = ev;
-    }
-    if (ev->is_write_available())
-    {
+    if (ev->is_writeable())
         FD_SET(ev->fd, event_writeset_in);
-        this->fd_map_rw[ev->fd] = ev;
-    }
 
     return 0;
 }
 
-int select_base::del(rw_event *ev)
+int select_base::del(std::shared_ptr<rw_event>ev)
 {
     // check_fdset();
 
-    if (!ev->is_read_available())
+    if (!ev->is_readable())
         FD_CLR(ev->fd, event_readset_in);
 
-    if (!ev->is_write_available())
+    if (!ev->is_writeable())
         FD_CLR(ev->fd, event_writeset_in);
     // check_fdset();
 

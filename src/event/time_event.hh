@@ -8,17 +8,24 @@ namespace eve
 class time_event : public event
 {
 
-  public:
+public:
 	struct timeval timeout;
 
-  public:
-	time_event(std::shared_ptr<event_base> base);
-	~time_event();
+public:
+	time_event(std::shared_ptr<event_base> base) : event(base) { timerclear(&timeout); }
+	~time_event() {}
 
-	void set_timer(int sec, int usec);
+	void set_timer(int sec, int usec)
+	{
+		struct timeval now, tv;
+		gettimeofday(&now, nullptr);
 
-	int add() override;
-	int del() override;
+		timerclear(&tv);
+		tv.tv_sec = sec;
+		tv.tv_usec = usec;
+
+		timeradd(&now, &tv, &timeout);
+	}
 };
 
 } // namespace eve

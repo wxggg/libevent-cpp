@@ -6,31 +6,31 @@ namespace eve
 {
 
 class http_client;
-class http_client_connection : public http_connection
+class http_client_connection : public http_connection, public std::enable_shared_from_this<http_client_connection>
 {
   public:
 	std::string servaddr;
 	unsigned int servport;
 
-	std::shared_ptr<http_client> client = nullptr;
+	std::weak_ptr<http_client> client;
 
 	int retry_cnt = 0; /* retry count */
 	int retry_max = 0; /* maximum number of retries */
 
   public:
-	http_client_connection(std::shared_ptr<event_base> base, std::shared_ptr<http_client> client);
-	~http_client_connection();
+	http_client_connection(std::shared_ptr<event_base> base, int fd, std::shared_ptr<http_client> client);
+	~http_client_connection() {}
 
 	void fail(http_connection_error error);
 
 	void do_read_done();
-	void do_write_active();
 
 	void dispatch();
 
-	void do_write_over();
+	void do_write_done();
 
 	int connect();
+	int make_request(std::shared_ptr<http_request> req);
 };
 
 } // namespace eve

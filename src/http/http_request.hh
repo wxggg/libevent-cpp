@@ -8,6 +8,7 @@
 #include <map>
 #include <memory>
 #include <functional>
+#include <iostream>
 
 namespace eve
 {
@@ -45,11 +46,11 @@ class event_base;
 class http_connection;
 class http_request
 {
+  private:
   public:
+    std::weak_ptr<http_connection> conn;
     std::shared_ptr<buffer> input_buffer = nullptr;
     std::shared_ptr<buffer> output_buffer = nullptr;
-    /* the connection object that this request belongs to */
-    http_connection *conn = nullptr;
     int flags;
 #define REQ_OWN_CONNECTION 0x0001
 #define PROXY_REQUEST 0x0002
@@ -80,7 +81,7 @@ class http_request
     std::map<std::string, std::string> output_headers;
 
   public:
-    http_request();
+    http_request(std::shared_ptr<http_connection> conn);
     ~http_request();
 
     inline void set_response(int code, const std::string &reason)
@@ -93,6 +94,15 @@ class http_request
     inline void set_cb(void (*cb)(std::shared_ptr<http_request>)) { this->cb = cb; }
 
     std::shared_ptr<event_base> get_base();
+
+
+    decltype(auto) get_connection()
+    {
+        auto c = conn.lock();
+        if (!c)
+            std::cerr << "error connection is expired\n";
+        return c;
+    }
 
     inline int is_connection_keepalive()
     {
