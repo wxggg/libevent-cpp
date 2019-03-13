@@ -19,8 +19,6 @@ INCLUDES = -I$(BASE_PATH)/src/event -I$(BASE_PATH)/src/http -I$(BASE_PATH)/src/u
 LINK_FLAGS = 
 #### END PROJECT SETTINGS ####
 
-# ccfile = rw-event-test.cc
-
 SOURCES = $(shell find $(SRC_PATH) -name '*.$(SRC_EXT)')
 BINS = $(SOURCES:$(SRC_PATH)/%.$(SRC_EXT)=$(BUILD_PATH)/%)
 
@@ -28,12 +26,6 @@ BINS = $(SOURCES:$(SRC_PATH)/%.$(SRC_EXT)=$(BUILD_PATH)/%)
 	$(CXX) -o $@ $< $(COMPILE_FLAGS) $(LIBS) $(INCLUDES)
 
 all: $(BINS)
-
-
-# # rw-event-test: rw-event-test.cc
-# # 	$(CXX) -o $@ $< $(COMPILE_FLAGS) $(LIBS) $(INCLUDES)
-
-# signal-test:signal-test.cc
 
 clean:
 	rm $(BINS)

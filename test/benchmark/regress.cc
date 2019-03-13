@@ -479,8 +479,8 @@ void test10(void)
     auto bev1 = std::make_shared<buffer_event>(pbase, fdpair[0]);
     auto bev2 = std::make_shared<buffer_event>(pbase, fdpair[1]);
 
-    char bufw1[4096], bufw2[8192];
     int target1 = 8192, target2 = 4096;
+    char bufw1[target2], bufw2[target1];
 
     bev1->register_readcb(test10_readcb, bev1.get(), target1);
     bev2->register_readcb(test10_readcb, bev2.get(), target2);

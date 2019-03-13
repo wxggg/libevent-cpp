@@ -5,6 +5,8 @@
 #include <assert.h>
 #include <sys/socket.h>
 
+#include <algorithm>
+
 namespace eve
 {
 
@@ -132,6 +134,26 @@ void http_server_connection::handle_request(std::shared_ptr<http_request> req)
     {
         server->handle_callbacks.at(realuri)(req);
         return;
+    }
+
+    for (const auto &kv : server->handle_callbacks)
+    {
+        auto v1 = split(kv.first, '/');
+        auto v2 = split(realuri, '/');
+        if (v1.size() != v2.size())
+            continue;
+        bool flag = true;
+        for (int i = 0; i < v1.size(); i++)
+            if (v1[i] != v2[i] && v1[i] != "*")
+            {
+                flag = false;
+                break;
+            }
+        if (flag)
+        {
+            kv.second(req);
+            return;
+        }
     }
 
     /* generic callback */
