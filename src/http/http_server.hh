@@ -66,6 +66,10 @@ class http_server : public std::enable_shared_from_this<http_server>
 		handle_callbacks[what] = cb;
 	}
 
+	inline void set_gen_cb(HandleCallBack cb)
+	{
+		gencb = cb;
+	}
 
 	inline void set_timeout(int sec) { timeout = sec; }
 
