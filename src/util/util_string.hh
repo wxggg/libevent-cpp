@@ -35,4 +35,5 @@ void htmlescape(std::string &html);
 
 std::vector<std::string> split(const std::string &s, char delimiter);
 
+std::string string_from_utf8(const std::string &in);
 } // namespace eve

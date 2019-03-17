@@ -124,22 +124,26 @@ void http_server_connection::handle_request(std::shared_ptr<http_request> req)
         return;
     }
 
-    std::string realuri = req->uri;
+    std::cout<<"handle:"<<req->uri<<std::endl;
+    req->uri = string_from_utf8(req->uri);
     size_t offset = req->uri.find("?");
     if (offset != std::string::npos)
-        realuri = req->uri.substr(0, offset);
+    {
+        req->query = req->uri.substr(offset);
+        req->uri = req->uri.substr(0, offset);
+    }
 
     auto server = get_server();
-    if (server->handle_callbacks.count(realuri) > 0)
+    if (server->handle_callbacks.count(req->uri) > 0)
     {
-        server->handle_callbacks.at(realuri)(req);
+        server->handle_callbacks.at(req->uri)(req);
         return;
     }
 
     for (const auto &kv : server->handle_callbacks)
     {
         auto v1 = split(kv.first, '/');
-        auto v2 = split(realuri, '/');
+        auto v2 = split(req->uri, '/');
         if (v1.size() != v2.size())
             continue;
         bool flag = true;

@@ -1,6 +1,7 @@
 #include <string>
 #include <sstream>
 #include <regex>
+#include <iostream>
 
 namespace eve
 {
@@ -51,6 +52,45 @@ std::vector<std::string> split(const std::string &s, char delimiter)
     while (std::getline(iss, token, delimiter))
         tokens.push_back(token);
     return tokens;
+}
+
+int hex_to_int(char a)
+{
+    if (a >= '0' && a <= '9')
+        return (a - 48);
+    else if (a >= 'A' && a <= 'Z')
+        return (a - 55);
+    else
+        return (a - 87);
+}
+std::string string_from_utf8(const std::string &in)
+{
+    std::string result;
+    std::stringstream ss;
+    int i = 0, n = in.length();
+    bool flag = false;
+    while (i < n)
+    {
+        char x = in[i++];
+        if (x == '%')
+        {
+            flag = true;
+            ss << (char)((16 * hex_to_int(in[i++]) + hex_to_int(in[i++])));
+        }
+        else
+        {
+            if (flag)
+            {
+                result += ss.str();
+                std::stringstream().swap(ss);
+            }
+            result += x;
+            flag = false;
+        }
+    }
+    if (flag)
+        result += ss.str();
+    return result;
 }
 
 } // namespace eve

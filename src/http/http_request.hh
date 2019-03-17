@@ -62,6 +62,7 @@ class http_request
     enum http_request_kind kind;
     enum http_cmd_type type;
     std::string uri;          /* uri after HTTP request was parsed */
+    std::string query;        /* query part in original uri */
     unsigned short major = 1; /* HTTP Major number */
     unsigned short minor = 1; /* HTTP Minor number */
 
@@ -94,7 +95,6 @@ class http_request
     inline void set_cb(void (*cb)(std::shared_ptr<http_request>)) { this->cb = cb; }
 
     std::shared_ptr<event_base> get_base();
-
 
     decltype(auto) get_connection()
     {

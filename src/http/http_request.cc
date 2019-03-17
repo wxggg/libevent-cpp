@@ -81,7 +81,7 @@ void http_request::send_page(std::shared_ptr<buffer> buf)
         set_response(200, "OK");
 
     output_headers.clear();
-    output_headers["Content-Type"] = "text/html";
+    output_headers["Content-Type"] = "text/html; charset=utf-8";
     output_headers["Connection"] = "close";
 
     __send(buf);
