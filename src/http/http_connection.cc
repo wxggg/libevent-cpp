@@ -37,12 +37,28 @@ http_connection::~http_connection()
     //         this->closecb(this);
     // }
 
-    // auto base = get_base();
-    // if (base)
-    // {
-    //     base->clean_event(readTimer);
-    //     base->clean_event(writeTimer);
-    // }
+    auto base = get_base();
+    if (base)
+    {
+        base->clean_event(readTimer);
+        base->clean_event(writeTimer);
+    }
+}
+
+void http_connection::close()
+{
+    if (get_obuf_length() > 0)
+    {
+        start_write();
+        return;
+    }
+    LOG << "close connection with fd=" << fd();
+    get_base()->remove_event(readTimer);
+    get_base()->remove_event(writeTimer);
+    // clean_event();
+    closefd(fd());
+    set_fd(-1);
+    state = CLOSED;
 }
 
 void http_connection::reset()
@@ -65,9 +81,7 @@ void http_connection::reset()
 
 void http_connection::start_read()
 {
-    // std::cout << __func__ << " state = " << state << "\n";
-    if (is_closed())
-        return;
+    assert(state != CLOSED);
     add_read_event();
     state = READING_FIRSTLINE;
     if (timeout > 0)
@@ -79,9 +93,7 @@ void http_connection::start_read()
 
 void http_connection::start_write()
 {
-    // std::cout << __func__ << " state = " << state << "\n";
-    if (is_closed())
-        return;
+    assert(state != CLOSED);
     if (get_obuf_length() <= 0)
         return;
     add_write_event();
@@ -111,7 +123,6 @@ void http_connection::read_firstline(std::shared_ptr<http_request> req)
     if (res == DATA_CORRUPTED)
     {
         /* Error while reading, terminate */
-        std::cerr << "[connect] " << __func__ << ": bad first lines" << std::endl;
         fail(HTTP_INVALID_HEADER);
         return;
     }
@@ -132,7 +143,6 @@ void http_connection::read_header(std::shared_ptr<http_request> req)
     if (res == DATA_CORRUPTED)
     {
         /* Error while reading, terminate */
-        std::cerr << "[connect] " << __func__ << ": bad header lines" << std::endl;
         fail(HTTP_INVALID_HEADER);
         return;
     }
@@ -153,18 +163,15 @@ void http_connection::read_header(std::shared_ptr<http_request> req)
         if (req->response_code == HTTP_NOCONTENT || req->response_code == HTTP_NOTMODIFIED ||
             (req->response_code >= 100 && req->response_code < 200))
         {
-            std::cerr << "[connect] " << __func__ << ": skipping body for code "
-                      << req->response_code << std::endl;
             do_read_done();
         }
         else
         {
-            std::cerr << "[connect] " << __func__ << ": start of read body for " << req->remote_host << std::endl;
             get_body(req);
         }
         break;
     default:
-        std::cerr << "[connect] " << __func__ << ": bad request kind" << std::endl;
+        LOG_ERROR << ": bad request kind";
         fail(HTTP_INVALID_HEADER);
         break;
     }
@@ -188,7 +195,7 @@ void http_connection::get_body(std::shared_ptr<http_request> req)
     {
         if (req->get_body_length() == -1)
         {
-            std::cerr << "[connect] " << __func__ << " error get body length = -1\n";
+            LOG_ERROR << " error get body length = -1";
             fail(HTTP_INVALID_HEADER);
             return;
         }
@@ -284,30 +291,26 @@ void http_connection::read_http()
     case IDLE:
     case WRITING:
     default:
-        std::cerr << "[connect] " << __func__ << ": illegal connection state " << state << std::endl;
+        LOG_ERROR << ": illegal connection state " << state;
         break;
     }
 }
 
 void http_connection::handler_read(http_connection *conn)
 {
-    // std::cout << __func__ << " state = " << conn->state << "\n";
     conn->remove_read_timer();
     conn->read_http();
 }
 
 void http_connection::handler_eof(http_connection *conn)
 {
-    // std::cout << __func__ << " state = " << conn->state << "\n";
+    LOG << "connection fd=" << conn->fd();
     if (conn->get_obuf_length() > 0)
         conn->start_write();
-    else
-        conn->close();
 }
 
 void http_connection::handler_write(http_connection *conn)
 {
-    // std::cout << __func__ << " state = " << conn->state << "\n";
     conn->remove_write_timer();
     if (conn->get_obuf_length() > 0)
     {
@@ -322,9 +325,8 @@ void http_connection::handler_write(http_connection *conn)
 
 void http_connection::handler_error(http_connection *conn)
 {
-    std::cout << __func__ << " state = " << conn->state << "\n";
-    std::cerr << "[HTTP] error read/write with EOF\n";
-    // conn->fail(HTTP_EOF);
+    LOG_ERROR << "[HTTP] error read/write connection fd=" << conn->fd();
+    conn->fail(HTTP_EOF);
 }
 
 } // namespace eve

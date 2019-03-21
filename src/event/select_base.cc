@@ -24,7 +24,6 @@ select_base::select_base()
 
 select_base::~select_base()
 {
-    std::cout<<"~select_base\n";
     free(event_readset_in);
     free(event_writeset_in);
     free(event_readset_out);
@@ -75,26 +74,20 @@ int select_base::dispatch(struct timeval *tv)
     check_fdset();
 
     if (evsignal_deliver() == -1)
-    {
-        std::cerr << "evsig->deliver() error\n";
         return -1;
-    }
 
     int res = select(_fds + 1, event_readset_out, event_writeset_out, nullptr, tv);
 
     // check_fdset();
 
     if (evsignal_recalc() == -1)
-    {
-        std::cerr << "evsig->recalc() error\n";
         return -1;
-    }
 
     if (res == -1)
     {
         if (errno != EINTR)
         {
-            std::cerr << "select error errno=" << errno << std::endl;
+            LOG_ERROR << "select error errno=" << errno;
             return -1;
         }
         evsignal_process();
@@ -102,7 +95,6 @@ int select_base::dispatch(struct timeval *tv)
     }
     else if (caught)
     {
-        std::cerr << "evsignal caught=1" << std::endl;
         evsignal_process();
     }
 
@@ -171,7 +163,7 @@ int select_base::add(std::shared_ptr<rw_event> ev)
 {
     if (ev->fd > MAX_SELECT_FD)
     {
-        std::cerr << "select warning: added fd>" << MAX_SELECT_FD << std::endl;
+        LOG_WARN << "select added fd>" << MAX_SELECT_FD << " , reset MAX_SELECT_FD if needed";
         exit(-1);
     }
     /*
@@ -202,7 +194,7 @@ int select_base::add(std::shared_ptr<rw_event> ev)
     return 0;
 }
 
-int select_base::del(std::shared_ptr<rw_event>ev)
+int select_base::del(std::shared_ptr<rw_event> ev)
 {
     // check_fdset();
 

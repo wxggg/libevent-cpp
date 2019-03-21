@@ -6,6 +6,8 @@
 #include <string>
 #include <iostream>
 
+#include <logger.hh>
+
 namespace eve
 {
 
@@ -13,10 +15,10 @@ inline int closefd(int fd)
 {
     if (fd <= 0)
     {
-        std::cerr << "[linux] warning close fd=" << fd << std::endl;
+        LOG_WARN << "[linux] close fd=" << fd ;
         return -1;
     }
-    // std::cout << "[FD] close fd=" << fd << std::endl;
+    LOG << "[FD] close fd=" << fd;
     return close(fd);
 }
 
@@ -28,9 +30,12 @@ inline int create_eventfd()
         std::cerr << "[linux] eventfd error\n";
         abort();
     }
-    // std::cout << "[FD] " << __func__ << " " << evfd << std::endl;
+    LOG << " fd=" << evfd;
     return evfd;
 }
+
+void wake(int fd);
+int read_wake_msg(int fd);
 
 std::string get_date();
 

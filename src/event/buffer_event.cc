@@ -14,9 +14,6 @@ buffer_event::buffer_event(std::shared_ptr<event_base> base, int fd)
 }
 buffer_event::~buffer_event()
 {
-    auto base = get_base();
-    if (base)
-        base->clean_event(ev);
 }
 
 size_t buffer_event::write(void *data, size_t size)

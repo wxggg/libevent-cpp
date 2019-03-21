@@ -3,12 +3,20 @@
 #include <cstring>
 #include <unistd.h>
 
+#include <logger.hh>
+
 namespace eve
 {
 
 void buffer::reset()
 {
     __drain(_off);
+}
+
+void buffer::resize(int n)
+{
+    __drain(_off);
+    __expand(n);
 }
 
 /*
@@ -40,7 +48,7 @@ std::string buffer::readline()
     data[i] = '\0';
     data[i + onemore] = '\0';
     std::string line(data);
-    __drain(i + onemore+1);
+    __drain(i + onemore + 1);
     return line;
 }
 
@@ -181,7 +189,10 @@ int buffer::__expand(size_t datlen)
         if (_origin_buf != _buf)
             __align();
         if ((newbuf = (unsigned char *)realloc(_buf, length)) == nullptr)
+        {
+            LOG_ERROR << "realloc error";
             return -1;
+        }
 
         _origin_buf = _buf = newbuf;
         _totallen = length;

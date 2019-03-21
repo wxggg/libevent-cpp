@@ -128,18 +128,29 @@ void http_dispatcher_cb(std::shared_ptr<http_request> req)
     req->send_reply(HTTP_OK, "Everything is find", buf);
 }
 
+void http_keep_alive_cb(std::shared_ptr<http_request> req)
+{
+    cerr << __func__ << " called!!!\n";
+    std::shared_ptr<buffer> buf = std::make_shared<buffer>();
+    
+    cout<<req->uri<<endl;
+
+    req->send_reply(HTTP_OK, "Everything is find", buf);
+}
+
 static shared_ptr<http_server> http_setup()
 {
     cout << __func__ << endl;
     auto server = make_shared<http_server>();
     server->resize_thread_pool(4);
-    server->set_timeout(5);
+    server->set_timeout(10);
 
     server->set_handle_cb("/test", http_test_cb);
     server->set_handle_cb("/chunked", http_chunked_cb);
     server->set_handle_cb("/postit", http_post_cb);
     server->set_handle_cb("/largedelay", http_large_delay_cb);
     server->set_handle_cb("/", http_dispatcher_cb);
+    server->set_handle_cb("/keep/*", http_keep_alive_cb);
 
     server->start(host, port);
     return server;
@@ -147,6 +158,7 @@ static shared_ptr<http_server> http_setup()
 
 int main(int argc, char const *argv[])
 {
+    init_log_file("regress_http_server.log");
     auto server = http_setup();
     server->start(host, port);
     return 0;

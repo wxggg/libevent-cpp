@@ -11,6 +11,8 @@
 #include <sys/time.h>
 #include <signal.h>
 
+#include <logger.hh>
+
 namespace eve
 {
 class event;
@@ -53,7 +55,7 @@ class event
 	{
 		auto b = base.lock();
 		if (!b)
-			std::cerr << "error base is expired\n";
+			LOG_ERROR << "error base is expired\n";
 		return b;
 	}
 

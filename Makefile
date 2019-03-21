@@ -16,7 +16,7 @@ RCOMPILE_FLAGS = -D NDEBUG
 # Additional debug-specific flags
 DCOMPILE_FLAGS = -D DEBUG
 # Add additional include paths
-INCLUDES = -Isrc/event -Isrc/http -Isrc/util -Isrc/thread
+INCLUDES = -Isrc/event -Isrc/http -Isrc/util -Isrc/thread -Isrc/core
 # General linker settings
 LINK_FLAGS = -shared -fPIC -ldl -pthread
 # Additional release-specific linker settings

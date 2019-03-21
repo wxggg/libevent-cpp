@@ -11,7 +11,8 @@ http_client::http_client()
     base = std::make_shared<epoll_base>();
 }
 
-std::shared_ptr<http_client_connection> http_client::make_connection(const std::string &address, unsigned int port)
+std::shared_ptr<http_client_connection> http_client::make_connection(
+    const std::string &address, unsigned int port)
 {
     int fd = get_nonblock_socket();
 

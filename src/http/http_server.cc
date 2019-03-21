@@ -52,8 +52,7 @@ static void __listen_cb(int fd, http_server *server)
     std::string host;
     int port;
     int nfd = accept_socket(fd, host, port);
-    // std::cout << "[server] ===> new client in with fd=" << nfd << " hostname="
-    //           << host << " portname=" << port << std::endl;
+    LOG << "[server] ===> new client in with fd=" << nfd << " hostname=" << host << " portname=" << port << "\n";
     auto cinfo = std::make_shared<http_client_info>(nfd, host, port);
     server->clientQueue.push(cinfo);
     server->wakeup_random(2);
@@ -68,10 +67,8 @@ int http_server::start(const std::string &address, unsigned short port)
 
     int fd = bind_socket(address, port, 1 /*reuse*/);
     if (fd == -1)
-    {
-        std::cerr << "[Error] binding socket to address=" << address << " port=" << port << std::endl;
         exit(-1);
-    }
+
     if (listenfd(fd) == -1)
         return -1;
 
@@ -81,8 +78,8 @@ int http_server::start(const std::string &address, unsigned short port)
     ev->set_persistent();
     base->add_event(ev);
 
-    std::cout << "[server] Listening on fd = " << fd << std::endl;
-    std::cout << "[server] Bound to port " << port << " - Awaiting connections ..." << std::endl;
+    LOG << "[server] Listening on fd = " << fd;
+    LOG << "[server] Bound to port " << port << " - Awaiting connections ...";
 
     base->loop();
     return 0;

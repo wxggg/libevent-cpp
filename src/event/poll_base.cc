@@ -1,5 +1,5 @@
-#include "poll_base.hh"
-#include "rw_event.hh"
+#include <poll_base.hh>
+#include <rw_event.hh>
 
 #include <assert.h>
 
@@ -48,7 +48,7 @@ int poll_base::dispatch(struct timeval *tv)
     int i = 0;
     for (const auto kv : fd_map_poll)
         fds[i++] = *kv.second;
-        
+
     int res = poll(fds, nfds, sec);
     if (evsignal_recalc() == -1)
         return -1;
@@ -57,7 +57,7 @@ int poll_base::dispatch(struct timeval *tv)
     {
         if (errno != EINTR)
         {
-            std::cerr << "poll\n";
+            LOG_ERROR << "poll\n";
             return -1;
         }
         evsignal_process();

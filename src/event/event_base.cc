@@ -3,6 +3,7 @@
 #include <signal_event.hh>
 #include <time_event.hh>
 // #include <util_network.hh>
+#include <logger.hh>
 
 #include <string>
 #include <cstring>
@@ -48,14 +49,14 @@ int event_base::add_event(const std::shared_ptr<event> &ev)
 		auto rw = std::dynamic_pointer_cast<rw_event>(ev);
 		if (rw->is_removeable())
 		{
-			std::cerr<<"[WARNING] add rw event with no READ or WRITE, please use enble_read() or enblae_write()\n";
+			LOG_WARN << "add rw event with no READ or WRITE, please use enble_read() or enblae_write()";
 		}
 		fdMapRw[rw->fd] = rw;
 		return add(rw);
 	}
 	else
 	{
-		std::cerr << "[ERROR] no such event defined as " << typeid(ev).name() << std::endl;
+		LOG_ERROR << "no such event defined as " << typeid(ev).name();
 		return -1;
 	}
 }
@@ -84,7 +85,7 @@ int event_base::remove_event(const std::shared_ptr<event> &ev)
 	}
 	else
 	{
-		std::cerr << "[ERROR] no such event defined as " << typeid(ev).name() << std::endl;
+		LOG_ERROR << "no such event defined as " << typeid(ev).name();
 		return -1;
 	}
 }
@@ -143,11 +144,11 @@ int event_base::__loop()
 	int done = 0;
 	while (!done)
 	{
-		// std::cout << "\n[event] loop" << i++ << std::endl;
+		LOG << "loop" << i++;
 		/* Terminate the loop if we have been asked to */
 		if (this->_terminated)
 		{
-			std::cout << "[event] event got terminated\n";
+			LOG << "[event] event got terminated";
 			_terminated = false;
 			break;
 		}
@@ -157,7 +158,7 @@ int event_base::__loop()
 		/* If we have no events, we just exit */
 		if (signalList.empty() && timeSet.empty() && !rw_event_size() && !nactive_events)
 		{
-			std::cout << "[event] have no events, just exit\n";
+			LOG << "[event] have no events, just exit";
 			return 1;
 		}
 
@@ -187,7 +188,7 @@ int event_base::__loop()
 
 		if (res == -1)
 		{
-			std::cout << "[event] dispatch exit res=" << res << std::endl;
+			LOG_ERROR << "[event] dispatch exit res=" << res;
 			return -1;
 		}
 
@@ -204,10 +205,7 @@ int event_base::__loop()
 			done = 1;
 
 		if (this->recalc() == -1)
-		{
-			std::cout << "[event] recalc exited -1\n";
 			return -1;
-		}
 	}
 	// std::cout << "loop exit with done=" << done << std::endl;
 	return 0;
@@ -293,7 +291,10 @@ int event_base::evsignal_recalc()
 		return 0;
 	needrecalc = 0;
 	if (sigprocmask(SIG_BLOCK, &evsigmask, nullptr) == -1)
+	{
+		LOG_ERROR << "sigprocmask error";
 		return -1;
+	}
 
 	struct sigaction sa;
 	/* Reinstall our signal handler. */
@@ -306,11 +307,14 @@ int event_base::evsignal_recalc()
 	{
 		if (ev->sig < 0 || ev->sig >= NSIG)
 		{
-			std::cout << "error sig not set\n";
+			LOG_ERROR << "sig not set";
 			exit(-1);
 		}
 		if (sigaction(ev->sig, &sa, nullptr) == -1)
+		{
+			LOG_ERROR << "sigaction error";
 			return -1;
+		}
 	}
 	return 0;
 }
@@ -319,7 +323,10 @@ int event_base::evsignal_deliver()
 {
 	if (signalList.empty())
 		return 0;
-	return sigprocmask(SIG_UNBLOCK, &evsigmask, nullptr);
+	int res = sigprocmask(SIG_UNBLOCK, &evsigmask, nullptr);
+	if (res == -1)
+		LOG_ERROR << "sigprocmask error";
+	return res;
 }
 
 void event_base::handler(int sig)

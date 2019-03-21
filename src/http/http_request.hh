@@ -10,6 +10,8 @@
 #include <functional>
 #include <iostream>
 
+#include <logger.hh>
+
 namespace eve
 {
 enum http_cmd_type
@@ -138,7 +140,7 @@ class http_request
     }
     inline int is_connection_close()
     {
-        return is_in_connection_close() || is_out_connection_close();
+        return (minor==0 && !is_connection_keepalive()) || is_in_connection_close() || is_out_connection_close();
     }
 
     int get_body_length();

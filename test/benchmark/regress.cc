@@ -414,13 +414,6 @@ void test8(void)
 
 void readcb(buffer_event *bev)
 {
-    // auto bev = ev.lock();
-    // if (!bev)
-    // {
-    //     cerr << "[Error] " << __func__ << " buffer_event expired" << endl;
-    //     exit(-1);
-    // }
-
     if (bev->get_ibuf_length() == 8333)
     {
         bev->remove_read_event();

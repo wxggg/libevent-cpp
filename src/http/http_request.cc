@@ -89,10 +89,8 @@ void http_request::send_page(std::shared_ptr<buffer> buf)
 
 void http_request::send_reply(int code, const std::string &reason, std::shared_ptr<buffer> buf)
 {
-    // std::cout << "[R] " << __func__ << " with code=" << code << " reason=" << reason << std::endl;
     set_response(code, reason);
-    if (buf)
-        __send(buf);
+    __send(buf);
 }
 
 void http_request::send_reply_start(int code, const std::string &reason)
@@ -184,12 +182,17 @@ http_request::parse_headers(std::shared_ptr<buffer> buf)
         }
 
         /* Processing of header lines */
-        std::vector<std::string> kv = split(line, ':');
-        trim(kv[0]);
-        trim(kv[1]);
-        k = kv[0], v = kv[1];
+        auto pos = line.find(':', 0);
+        if (pos == std::string::npos)
+        {
+            LOG_ERROR << "parse bad header " << line;
+            continue;
+        }
+        k = line.substr(0, pos);
+        v = line.substr(pos + 1);
+        k = trim(k);
+        v = trim(v);
         this->input_headers[k] = v;
-        // std::cerr << "kv= " << kv[0] << ":" << kv[1] << std::endl;
     }
 
     return ALL_DATA_READ;
@@ -198,7 +201,6 @@ http_request::parse_headers(std::shared_ptr<buffer> buf)
 enum message_read_status
 http_request::handle_chunked_read(std::shared_ptr<buffer> buf)
 {
-    // std::cerr<<"[R] "<<__func__<<" buf-length="<<buf->get_length()<<" ntoread="<<ntoread<<std::endl;
     std::string line;
     while (buf->get_length() > 0)
     {
@@ -243,8 +245,8 @@ int http_request::get_body_length()
     else if (content_length.empty() && connection != "Close")
     {
         /* Bad combination, we don't know when it will end */
-        std::cerr << __FUNCTION__ << ": we got content length, but the server wants to keep the connection open:"
-                  << connection << std::endl;
+        LOG_ERROR << "we got content length, but the server "
+                  << "wants to keep the connection open:" << connection;
         return -1;
     }
     else if (content_length.empty())
@@ -256,7 +258,7 @@ int http_request::get_body_length()
         long ntoread = std::stol(content_length);
         if (ntoread < 0)
         {
-            std::cerr << __func__ << ": illegal content length:" << content_length << std::endl;
+            LOG_ERROR << "illegal content length:" << content_length;
             return -1;
         }
         this->ntoread = ntoread;
@@ -288,8 +290,6 @@ void http_request::make_header()
 
 void http_request::__send(std::shared_ptr<buffer> databuf)
 {
-    if (!databuf)
-        return;
     this->output_buffer->push_back_buffer(databuf, -1);
 
     /* Adds headers to the response */
@@ -306,7 +306,10 @@ int http_request::__parse_request_line(std::string line)
     std::istringstream iss(line);
     std::vector<std::string> words = split(line, ' ');
     if (words.size() < 3)
+    {
+        LOG_ERROR << "receved bad request line=" << line;
         return -1;
+    }
 
     std::string method = words[0];
     std::string uri = words[1];
@@ -320,7 +323,7 @@ int http_request::__parse_request_line(std::string line)
         this->type = REQ_HEAD;
     else
     {
-        std::cerr << __FUNCTION__ << ": bad method:" << method << " on request:" << this->remote_host << std::endl;
+        LOG_ERROR << "bad method:" << method << " on request:" << this->remote_host;
         return -1;
     }
 
@@ -336,7 +339,7 @@ int http_request::__parse_request_line(std::string line)
     }
     else
     {
-        std::cerr << __func__ << ": bad version:" << version << " on request:" << this->remote_host << std::endl;
+        LOG_ERROR << "bad version:" << version << " on request:" << this->remote_host;
         return -1;
     }
     this->uri = uri;
@@ -368,7 +371,7 @@ int http_request::__parse_response_line(std::string line)
     }
     else
     {
-        std::cerr << __func__ << ": bad protocol:" << protocol << " on request:" << this->remote_host << std::endl;
+        LOG_ERROR << "bad protocol:" << protocol << " on request:" << this->remote_host;
         return -1;
     }
 
@@ -430,6 +433,7 @@ void http_request::__make_header_response()
 
         if (minor == 1 || is_keepalive)
         {
+            output_headers["Connection"] = "keep-alive";
             /* 
 			 * we need to add the content length if the
 			 * user did not give it, this is required for
@@ -442,7 +446,7 @@ void http_request::__make_header_response()
 
     /* Potentially add headers for unidentified content. */
     if (output_buffer->get_length() > 0 && output_headers["Content-Type"].empty())
-        output_headers["Content-Type"] = "text/html; charset=ISO-8859-1";
+        output_headers["Content-Type"] = "text/html; charset=utf-8";
 
     /* if the request asked for a close, we send a close, too */
     if (is_in_connection_close())

@@ -9,7 +9,6 @@ using namespace eve;
 
 void home(shared_ptr<http_request> req)
 {
-    // cerr << __func__ << " called\n";
     std::shared_ptr<buffer> buf = std::make_shared<buffer>();
     buf->push_back_string("This is funnyThis is funnyThis iunny");
 
@@ -20,10 +19,12 @@ void home(shared_ptr<http_request> req)
 
 int main(int argc, char const *argv[])
 {
+    init_log_file("server.log");
     auto server = make_shared<http_server>();
+    server->set_timeout(15);
 
-    server->set_handle_cb("/test", home);
-    server->resize_thread_pool(1);
+    server->set_handle_cb("/", home);
+    server->resize_thread_pool(4);
     server->start("localhost", 8088);
 
     return 0;

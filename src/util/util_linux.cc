@@ -5,7 +5,7 @@
 
 namespace eve
 {
-    
+
 std::string get_date()
 {
     char date[50];
@@ -19,5 +19,23 @@ std::string get_date()
     return "";
 }
 
+void wake(int fd)
+{
+    std::string msg = "0x123456";
+    size_t n = write(fd, msg.c_str(), msg.length());
+    if (n <= 0)
+        LOG_WARN << " wake write error\n";
+}
 
-} // nameeve
+int read_wake_msg(int fd)
+{
+    char buf[32];
+    if (read(fd, buf, sizeof(buf)) <= 0)
+    {
+        LOG_WARN << " read error\n";
+        return -1;
+    }
+    return 0;
+}
+
+} // namespace eve

@@ -36,6 +36,7 @@ class buffer
 		delete _origin_buf;
 	}
 	void reset();
+	void resize(int n);
 	int remove(void *data, size_t datlen);
 	std::string readline();
 

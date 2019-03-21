@@ -18,19 +18,19 @@ int set_fd_nonblock(int fd)
 {
     if (fd < 0)
     {
-        std::cerr << "[NET] " << __func__ << " : error fd < 0\n";
+        LOG_ERROR << " : error fd < 0";
         return -1;
     }
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
     {
-        std::cerr << "[NET] " << __func__ << ": fcntl set nonblock err fd = " << fd << std::endl;
+        LOG_ERROR << ": fcntl set nonblock err fd = " << fd;
         return -1;
     }
 
     if (fcntl(fd, F_SETFD, 1) == -1)
     {
-        std::cerr << "[NET] " << __func__ << ": fcntl setfd err fd = " << fd << std::endl;
+        LOG_ERROR << ": fcntl setfd err fd = " << fd;
         return -1;
     }
 
@@ -42,12 +42,11 @@ int get_nonblock_socket()
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1)
     {
-        std::cerr << "[NET] " << __func__ << " socket err\n";
+        LOG_ERROR << " socket err\n";
         return -1;
     }
     if (set_fd_nonblock(fd) == -1)
         return -1;
-    // std::cerr << "[FD] get nonblock socket=" << fd << std::endl;
     return fd;
 }
 
@@ -66,9 +65,9 @@ static struct addrinfo *__getaddrinfo(const std::string &address, unsigned short
     if (ai_result != 0)
     {
         if (ai_result == EAI_SYSTEM)
-            std::cerr << "[netowork] " << __func__ << " getaddrinfo err\n";
+            LOG_ERROR << " getaddrinfo err\n";
         else
-            std::cerr << "[NET] " << __func__ << " getaddrinfo err with " << gai_strerror(ai_result) << std::endl;
+            LOG_ERROR << " getaddrinfo err with " << gai_strerror(ai_result);
         return nullptr;
     }
     return aitop;
@@ -100,7 +99,10 @@ int bind_socket(const std::string &address, unsigned short port, int reuse)
     if (aitop)
     {
         if (bind(fd, aitop->ai_addr, aitop->ai_addrlen) == -1)
+        {
+            LOG_ERROR << "bind socket error";
             goto out;
+        }
     }
 
     freeaddrinfo(aitop);
@@ -122,12 +124,11 @@ int accept_socket(int fd, std::string &host, int &port)
     socklen_t client_addrlen = sizeof(ss_client);
 
     int sockfd = accept(fd, (struct sockaddr *)&ss_client, &client_addrlen);
-    // std::cout << "[FD] accept socket fd=" << sockfd << std::endl;
 
     if (sockfd == -1)
     {
         if (errno != EAGAIN && errno != EINTR)
-            std::cerr << "[NET] " << __func__ << ": accept err errno=" << errno << std::endl;
+            LOG_ERROR << ": accept err errno=" << errno;
         return -1;
     }
     if (set_fd_nonblock(sockfd) == -1)
@@ -143,9 +144,9 @@ int accept_socket(int fd, std::string &host, int &port)
     if (ni_result != 0)
     {
         if (ni_result == EAI_SYSTEM)
-            std::cerr << "[NET] " << __func__ << " getnameinfo err\n";
+            LOG_ERROR << " getnameinfo err";
         else
-            std::cerr << "[NET] " << __func__ << " getnameinfo err with " << gai_strerror(ni_result) << std::endl;
+            LOG_ERROR << " getnameinfo err with " << gai_strerror(ni_result);
         return -1;
     }
 
@@ -160,7 +161,7 @@ int socket_connect(int fd, const std::string &address, unsigned short port)
 
     if (!ai)
     {
-        std::cerr << "[NET] " << __func__ << " error get addrinfo: " << address << ":" << port << std::endl;
+        LOG_ERROR << " error get addrinfo: " << address << ":" << port;
         return -1;
     }
 
@@ -168,7 +169,7 @@ int socket_connect(int fd, const std::string &address, unsigned short port)
     {
         if (errno != EINPROGRESS)
         {
-            std::cerr << "[NET] " << __func__ << " err with errno=" << errno << std::endl;
+            LOG_ERROR << " err with errno=" << errno;
             freeaddrinfo(ai);
             return -1;
         }
@@ -183,7 +184,7 @@ std::pair<int, int> get_fdpair()
 {
     int pairfd[2];
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, pairfd) == -1)
-        std::cerr << "[NET] " << __func__ << " socketpair error\n";
+        LOG_ERROR << " socketpair error\n";
 
     // std::cout << "[FD] " << __func__ << " " << pairfd[0] << "," << pairfd[1] << std::endl;
     return std::make_pair(pairfd[0], pairfd[1]);
@@ -193,7 +194,7 @@ int listenfd(int fd)
 {
     if (listen(fd, 128) == -1)
     {
-        std::cerr << "[NET] " << __func__ << ":listen err\n";
+        LOG_ERROR << "listen error";
         close(fd);
         return -1;
     }
@@ -205,12 +206,12 @@ int check_socket(int socket)
     int error;
     if (getsockopt(socket, SOL_SOCKET, SO_ERROR, (void *)&error, (socklen_t *)sizeof(error)) == -1)
     {
-        std::cerr << "[NET] " << __func__ << ": getsockopt err with errno=" << errno << std::endl;
+        LOG_ERROR << ": getsockopt err with errno=" << errno;
         return -1;
     }
     if (error)
     {
-        std::cerr << "[NET] " << __func__ << ": err with " << std::strerror(error) << std::endl;
+        LOG_ERROR << ": err with " << std::strerror(error);
         return -1;
     }
     return 0;
@@ -223,11 +224,11 @@ int http_connect(const std::string &address, unsigned short port)
         return -1;
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1)
-        std::cerr << "[NET] " << __func__ << "socket failed\n";
+        LOG_ERROR << "socket failed";
 
     // std::cout << "[FD] " << __func__ << " fd=" << sockfd << std::endl;
     if (connect(sockfd, aitop->ai_addr, aitop->ai_addrlen) == -1)
-        std::cerr << "[NET] " << __func__ << "connec failed\n";
+        LOG_ERROR << "connec failed";
     freeaddrinfo(aitop);
     return sockfd;
 }

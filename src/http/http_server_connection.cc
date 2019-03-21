@@ -1,6 +1,7 @@
 #include <http_server_connection.hh>
 #include <http_server.hh>
 #include <util_network.hh>
+#include <logger.hh>
 
 #include <assert.h>
 #include <sys/socket.h>
@@ -12,17 +13,18 @@ namespace eve
 
 static void read_timeout_cb(http_server_connection *conn)
 {
-    std::cout << __func__ << " called\n";
+    LOG_WARN << "server connection read timeout " << conn->clientaddress << ":" << conn->clientport;
     conn->fail(HTTP_TIMEOUT);
 }
 
 static void write_timeout_cb(http_server_connection *conn)
 {
-    std::cout << __func__ << " called\n";
+    LOG_WARN << "server connection write timeout " << conn->clientaddress << ":" << conn->clientport;
     conn->fail(HTTP_TIMEOUT);
 }
 
-http_server_connection::http_server_connection(std::shared_ptr<event_base> base, int fd, std::shared_ptr<http_server> server)
+http_server_connection::http_server_connection(
+    std::shared_ptr<event_base> base, int fd, std::shared_ptr<http_server> server)
     : http_connection(base, fd), server(server)
 {
     base->register_callback(readTimer, read_timeout_cb, this);
@@ -32,8 +34,7 @@ http_server_connection::http_server_connection(std::shared_ptr<event_base> base,
 
 void http_server_connection::fail(http_connection_error error)
 {
-    std::cout << __func__ << " state = " << state << "\n";
-    std::cout << "<" << std::this_thread::get_id() << ">:" << __func__ << " handle error = " << error << std::endl;
+    LOG_WARN << "server connection fail on error=" << error << " state=" << state;
     /* 
      * for incoming requests, there are two different
      * failure cases.  it's either a network level error
@@ -76,7 +77,6 @@ void http_server_connection::fail(http_connection_error error)
 
 void http_server_connection::do_read_done()
 {
-    // std::cout << __func__ << " state = " << state << "\n";
     assert(state != CLOSED);
 
     auto req = requests.front();
@@ -85,7 +85,6 @@ void http_server_connection::do_read_done()
         fail(HTTP_EOF);
         return;
     }
-    // std::cout << "<" << std::this_thread::get_id() << ">:" << __func__ << " read request uri=" << req->uri << " type=" << req->type << std::endl;
 
     start_write();
     handle_request(req);
@@ -94,7 +93,6 @@ void http_server_connection::do_read_done()
 
 int http_server_connection::associate_new_request()
 {
-    // std::cout << __func__ << " state = " << state << "\n";
     assert(state != CLOSED);
 
     auto req = std::make_shared<http_request>(shared_from_this());
@@ -106,7 +104,8 @@ int http_server_connection::associate_new_request()
     req->remote_host = clientaddress;
     req->remote_port = clientport;
 
-    // std::cout << "<" << std::this_thread::get_id() << ">:" << __func__ << " get request from " << clientaddress << ":" << clientport << std::endl;
+    LOG << "<" << std::this_thread::get_id() << ">:"
+        << " get request from " << clientaddress << ":" << clientport;
 
     start_read();
 
@@ -115,16 +114,17 @@ int http_server_connection::associate_new_request()
 
 void http_server_connection::handle_request(std::shared_ptr<http_request> req)
 {
-    // std::cout << __func__ << " state = " << state << "\n";
     assert(state != CLOSED);
 
     if (req->uri.empty())
     {
         req->send_error(HTTP_BADREQUEST, "Bad Request");
+        LOG_ERROR << "handle " << HTTP_BADREQUEST << " Bad Request";
         return;
     }
 
-    std::cout<<"handle:"<<req->uri<<std::endl;
+    LOG << "handle uri=" << req->uri;
+
     req->uri = string_from_utf8(req->uri);
     size_t offset = req->uri.find("?");
     if (offset != std::string::npos)
@@ -172,7 +172,6 @@ void http_server_connection::handle_request(std::shared_ptr<http_request> req)
 
 void http_server_connection::do_write_done()
 {
-    // std::cout << __func__ << " state = " << state << "\n";
     assert(state != CLOSED);
 
     auto req = requests.front();
@@ -180,12 +179,7 @@ void http_server_connection::do_write_done()
         return;
     requests.pop();
 
-    // std::cerr << __func__ << " fixme: deelte possible detection events\n";
-
-    int need_close = (req->minor == 0 && !req->is_connection_keepalive()) ||
-                     req->is_connection_close();
-
-    if (need_close)
+    if (req->is_connection_close())
     {
         close();
         return;

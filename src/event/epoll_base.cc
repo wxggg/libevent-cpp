@@ -1,5 +1,5 @@
 #include <epoll_base.hh>
-#include "rw_event.hh"
+#include <rw_event.hh>
 
 #include <sys/resource.h>
 
@@ -13,7 +13,7 @@ epoll_base::epoll_base()
 		_nfds = rl.rlim_cur;
 
 	if ((_epfd = epoll_create(1)) == -1)
-		std::cerr << "epoll_create\n";
+		LOG_ERROR << "epoll_create\n";
 
 	_epevents = new struct epoll_event[_nfds];
 }
@@ -45,7 +45,7 @@ int epoll_base::dispatch(struct timeval *tv)
 	{
 		if (errno != EINTR)
 		{
-			std::cerr << "epoll_wait\n";
+			LOG_ERROR << "epoll_wait error";
 			return -1;
 		}
 		evsignal_process();
@@ -96,7 +96,10 @@ int epoll_base::add(std::shared_ptr<rw_event> ev)
 		epev.events |= EPOLLOUT;
 
 	if (epoll_ctl(_epfd, op, ev->fd, &epev) == -1)
+	{
+		LOG_ERROR << "epoll_ctl error";
 		return -1;
+	}
 
 	ev->epoll_in |= ev->is_readable();
 	ev->epoll_out |= ev->is_writeable();
@@ -119,27 +122,36 @@ int epoll_base::del(std::shared_ptr<rw_event> ev)
 	if (!ev->is_writeable())
 		events |= EPOLLOUT;
 
-	if ((events & (EPOLLIN | EPOLLOUT)) != (EPOLLIN | EPOLLOUT)) 
+	if ((events & (EPOLLIN | EPOLLOUT)) != (EPOLLIN | EPOLLOUT))
 	{
-		if ((events & EPOLLIN) && ev->epoll_out) {
+		if ((events & EPOLLIN) && ev->epoll_out)
+		{
 			writedelete = false;
 			events = EPOLLOUT;
 			op = EPOLL_CTL_MOD;
 		}
-		else if ((events & EPOLLOUT) && ev->epoll_in) {
+		else if ((events & EPOLLOUT) && ev->epoll_in)
+		{
 			readdelete = false;
 			events = EPOLLIN;
 			op = EPOLL_CTL_MOD;
 		}
 	}
-	
+
 	epev.events = events;
 
-	if (writedelete) ev->epoll_out = false;
-	if (readdelete) ev->epoll_in = false;
+	if (writedelete)
+		ev->epoll_out = false;
+	if (readdelete)
+		ev->epoll_in = false;
 
 	if (epoll_ctl(_epfd, op, ev->fd, &epev) == -1)
+	{
+		std::cout << "fd=" << ev->fd << std::endl;
+		LOG_ERROR << "epoll_ctl error with errno="<<errno;
+		perror("??");
 		return -1;
+	}
 
 	return 0;
 }

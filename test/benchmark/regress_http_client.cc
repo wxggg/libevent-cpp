@@ -8,6 +8,7 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 
 using namespace std;
 using namespace eve;
@@ -192,7 +193,7 @@ static void close_detect_cb(std::shared_ptr<http_request> req)
 
     auto base = req->get_base();
     auto ev = create_event<time_event>(base);
-    ev->set_timer(3, 0);
+    ev->set_timer(5, 0);
     base->register_callback(ev, close_detect_launch);
     base->add_event(ev);
 }
@@ -244,8 +245,6 @@ static void http_postrequest_done(shared_ptr<http_request> req)
         cerr << "Faild length\n";
         exit(1);
     }
-
-    // base->set_terminated();
 }
 
 static void http_post_test(void)
@@ -464,47 +463,64 @@ static void http_chunked_handle_test(void)
     client->run();
 }
 
+static int count_req = 1;
+static void keep_alive_cb(shared_ptr<http_request> req)
+{
+    cout << "count=" << count_req++ << endl;
+    cout<<req->input_buffer->get_data()<<endl;
+    cout<<req->uri<<endl;
+}
+
 static void http_keepalive_test(void)
 {
     cout << __func__ << endl;
     auto client = make_shared<http_client>();
     auto conn = client->make_connection(host, port);
-    auto req = make_shared<http_request>(conn);
 
-    req->set_cb(request_chunked_done);
-    req->output_headers["Connection"] = "keep-alive";
-    req->output_headers["Host"] = "somehost";
-    req->type = REQ_GET;
-    req->uri = "/";
+    vector<shared_ptr<http_request>> reqs;
 
-    conn->make_request(req);
+    for (int i = 0; i < 20; i++)
+    {
+        auto req = make_shared<http_request>(conn);
+
+        req->set_cb(keep_alive_cb);
+        req->output_headers["Connection"] = "keep-alive";
+        req->output_headers["Host"] = "somehost";
+        req->type = REQ_GET;
+        req->uri = "/keep/"+to_string(i);
+
+        conn->make_request(req);
+        reqs.push_back(req);
+    }
+
     client->run();
 }
 
 int main(int argc, char const *argv[])
 {
+    init_log_file("regress_http_client.log");
     http_basic_test();
 
-    // http_connection_test(0);
-    // http_connection_test(1);
+    http_connection_test(0);
+    http_connection_test(1);
 
-    // http_close_detection(0);
-    // http_close_detection(1);
+    http_close_detection(0);
+    http_close_detection(1);
 
-    // http_post_test();
+    http_post_test();
 
-    // http_failure_test();
+    http_failure_test();
 
-    // http_dispatcher_test();
+    http_dispatcher_test();
 
-    // http_multi_line_header_test();
+    http_multi_line_header_test();
 
-    // http_negative_content_length_test();
+    http_negative_content_length_test();
 
-    // http_chunked_test();
-    // http_chunked_handle_test();
+    http_chunked_test();
+    http_chunked_handle_test();
 
-    // http_keepalive_test();
+    http_keepalive_test();
     std::cout << "succeed\n";
     return 0;
 }

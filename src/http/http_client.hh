@@ -19,7 +19,8 @@ public:
 
   inline void set_timeout(int sec) { timeout = sec; }
 
-  std::shared_ptr<http_client_connection> make_connection(const std::string &address, unsigned int port);
+  std::shared_ptr<http_client_connection> make_connection(
+      const std::string &address, unsigned int port);
 
   void run();
 };

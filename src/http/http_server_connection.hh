@@ -22,9 +22,7 @@ public:
   {
     auto sserver = server.lock();
     if (!sserver)
-    {
-      std::cerr << "[Error] server is expired\n";
-    }
+      LOG_ERROR << " server is expired\n";
     return sserver;
   }
 

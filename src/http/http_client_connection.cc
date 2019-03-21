@@ -11,13 +11,13 @@ namespace eve
 
 static void read_timeout_cb(http_client_connection *conn)
 {
-    std::cout << "[client:] " << __func__ << " called\n";
+    LOG_WARN << "client connection read timeout";
     conn->fail(HTTP_TIMEOUT);
 }
 
 static void write_timeout_cb(http_client_connection *conn)
 {
-    std::cout << "[client:] " << __func__ << " called\n";
+    LOG_WARN << "client connection read timeout";
     conn->fail(HTTP_TIMEOUT);
 }
 
@@ -32,7 +32,7 @@ http_client_connection::http_client_connection(std::shared_ptr<event_base> base,
 void http_client_connection::fail(http_connection_error error)
 {
     auto req = requests.front();
-    std::cerr << "[client:FAIL] " << __func__ << " req->uri=" << req->uri << " with error=" << error << std::endl;
+    LOG_ERROR << " req->uri=" << req->uri << " with error=" << error;
 
     this->requests.pop();
     /* xxx: maybe we should fail all requests??? */
@@ -60,6 +60,13 @@ void http_client_connection::do_read_done()
     if (req->cb)
         req->cb(req);
 
+    if (!requests.empty())
+    {
+        auto req = requests.front();
+        req->make_header();
+        start_write();
+    }
+
     return;
 }
 
@@ -71,32 +78,9 @@ void http_client_connection::do_write_done()
     assert(state == WRITING);
 
     start_read();
-    // add_read_event();
-    // state = READING_FIRSTLINE;
 
     auto req = requests.front();
     req->kind = RESPONSE;
-}
-
-void http_client_connection::dispatch()
-{
-    if (requests.empty())
-        return;
-
-    if (!is_connected())
-    {
-        if (this->connect() == -1)
-            return;
-    }
-
-    auto req = requests.front();
-
-    assert(state == IDLE);
-
-    state = WRITING;
-    req->make_header();
-
-    add_write_event();
 }
 
 int http_client_connection::connect()
@@ -126,7 +110,15 @@ int http_client_connection::make_request(std::shared_ptr<http_request> req)
     req->remote_port = servport;
 
     requests.push(req);
-    dispatch();
+    // dispatch();
+    if (!is_connected())
+    {
+        if (this->connect() == -1)
+            return -1;
+    }
+
+    req->make_header();
+    start_write();
 
     return 0;
 }

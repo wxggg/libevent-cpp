@@ -77,18 +77,8 @@ class http_connection : public buffer_event
 
 	virtual void fail(enum http_connection_error error) = 0;
 
-	void close()
-	{
-		if (get_obuf_length() > 0)
-		{
-			start_write();
-			return;
-		}
-		clean_event();
-		closefd(fd());
-		set_fd(-1);
-		state = CLOSED;
-	}
+	void close();
+	
 	inline bool is_closed()
 	{
 		return state == CLOSED;
