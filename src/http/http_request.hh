@@ -51,8 +51,8 @@ class http_request
   private:
   public:
     std::weak_ptr<http_connection> conn;
-    std::shared_ptr<buffer> input_buffer = nullptr;
-    std::shared_ptr<buffer> output_buffer = nullptr;
+    std::unique_ptr<buffer> input_buffer;
+    std::unique_ptr<buffer> output_buffer;
     int flags;
 #define REQ_OWN_CONNECTION 0x0001
 #define PROXY_REQUEST 0x0002
@@ -140,27 +140,27 @@ class http_request
     }
     inline int is_connection_close()
     {
-        return (minor==0 && !is_connection_keepalive()) || is_in_connection_close() || is_out_connection_close();
+        return (minor == 0 && !is_connection_keepalive()) || is_in_connection_close() || is_out_connection_close();
     }
 
     int get_body_length();
 
-    enum message_read_status parse_firstline(std::shared_ptr<buffer> buf);
-    enum message_read_status parse_headers(std::shared_ptr<buffer> buf);
-    enum message_read_status handle_chunked_read(std::shared_ptr<buffer> buf);
+    enum message_read_status parse_firstline(std::unique_ptr<buffer> &buf);
+    enum message_read_status parse_headers(std::unique_ptr<buffer> &buf);
+    enum message_read_status handle_chunked_read(std::unique_ptr<buffer> &buf);
 
     void send_error(int error, std::string reason);
     void send_not_found();
-    void send_page(std::shared_ptr<buffer> buf);
-    void send_reply(int code, const std::string &reason, std::shared_ptr<buffer> buf);
+    void send_page(std::unique_ptr<buffer> buf);
+    void send_reply(int code, const std::string &reason, std::unique_ptr<buffer> buf);
     void send_reply_start(int code, const std::string &reason);
-    void send_reply_chunk(std::shared_ptr<buffer> buf);
+    void send_reply_chunk(std::unique_ptr<buffer> buf);
     void send_reply_end();
 
     void make_header();
 
   private:
-    void __send(std::shared_ptr<buffer> databuf);
+    void __send(std::unique_ptr<buffer> databuf);
 
     int __parse_request_line(std::string line);
     int __parse_response_line(std::string line);

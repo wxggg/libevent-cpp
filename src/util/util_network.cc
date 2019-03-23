@@ -174,7 +174,7 @@ int socket_connect(int fd, const std::string &address, unsigned short port)
             return -1;
         }
     }
-    // std::cout << "[NET] " << __func__ << " succeed\n";
+    LOG << " succeed connect to " << address << ":" << port;
 
     freeaddrinfo(ai);
     return 0;

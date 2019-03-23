@@ -148,8 +148,9 @@ int epoll_base::del(std::shared_ptr<rw_event> ev)
 	if (epoll_ctl(_epfd, op, ev->fd, &epev) == -1)
 	{
 		std::cout << "fd=" << ev->fd << std::endl;
-		LOG_ERROR << "epoll_ctl error with errno="<<errno;
+		LOG_ERROR << "epoll_ctl error with errno=" << errno;
 		perror("??");
+		exit(-1);
 		return -1;
 	}
 

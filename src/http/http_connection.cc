@@ -40,8 +40,8 @@ http_connection::~http_connection()
     auto base = get_base();
     if (base)
     {
-        base->clean_event(readTimer);
-        base->clean_event(writeTimer);
+        base->remove_event(readTimer);
+        base->remove_event(writeTimer);
     }
 }
 
@@ -55,7 +55,7 @@ void http_connection::close()
     LOG << "close connection with fd=" << fd();
     get_base()->remove_event(readTimer);
     get_base()->remove_event(writeTimer);
-    // clean_event();
+    get_base()->clean_rw_event(ev);
     closefd(fd());
     set_fd(-1);
     state = CLOSED;
@@ -63,17 +63,17 @@ void http_connection::close()
 
 void http_connection::reset()
 {
-    if (fd() != -1)
-    {
-        // remove_read_event();
-        // remove_write_event();
-        // remove_read_timer();
-        // remove_write_timer();
-        // /* inform interested parties about connection close */
-        // if (is_connected() && closecb != nullptr)
-        //     closecb(this);
-        // close();
-    }
+    // if (fd() != -1)
+    // {
+    //     // remove_read_event();
+    //     // remove_write_event();
+    //     // remove_read_timer();
+    //     // remove_write_timer();
+    //     // /* inform interested parties about connection close */
+    //     // if (is_connected() && closecb != nullptr)
+    //     //     closecb(this);
+    //     close();
+    // }
     state = DISCONNECTED;
     input->reset();
     output->reset();

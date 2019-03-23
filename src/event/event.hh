@@ -42,6 +42,8 @@ class event
 
 	int err = -1;
 
+	bool alive = false;
+
   public:
 	event() {}
 	event(std::shared_ptr<event_base> base);

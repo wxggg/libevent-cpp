@@ -18,7 +18,7 @@ unsigned short port = 8102;
 void http_test_cb(std::shared_ptr<http_request> req)
 {
     cerr << __func__ << " called\n";
-    std::shared_ptr<buffer> buf = std::make_shared<buffer>();
+    auto buf = std::make_unique<buffer>();
     buf->push_back_string("This is funny");
     const std::string &multi = req->input_headers["X-multi"];
     if (!multi.empty())
@@ -34,7 +34,7 @@ void http_test_cb(std::shared_ptr<http_request> req)
         req->output_headers["Content-Length"] = "-100";
 
     /* allow sending of an empty reply */
-    req->send_reply(HTTP_OK, "Everything is fine", req->input_headers["Empty"].empty() ? buf : nullptr);
+    req->send_reply(HTTP_OK, "Everything is fine", req->input_headers["Empty"].empty() ? std::move(buf) : nullptr);
 }
 
 static const string CHUNKS[] = {
@@ -52,9 +52,9 @@ static void
 http_chunked_trickle_cb(std::shared_ptr<time_event> ev, struct chunk_req_state *state)
 {
     cerr << __func__ << " called!!\n";
-    std::shared_ptr<buffer> buf = std::make_shared<buffer>();
+    auto buf = std::make_unique<buffer>();
     buf->push_back_string(CHUNKS[state->i]);
-    state->req->send_reply_chunk(buf);
+    state->req->send_reply_chunk(std::move(buf));
 
     if (++state->i < static_cast<int>(sizeof(CHUNKS) / sizeof(CHUNKS[0])))
     {
@@ -97,10 +97,10 @@ void http_post_cb(std::shared_ptr<http_request> req)
 
     cout << "get data::" << req->input_buffer->get_data() << endl;
 
-    std::shared_ptr<buffer> buf = std::make_shared<buffer>();
+    auto buf = std::make_unique<buffer>();
     buf->push_back_string("This is funny");
 
-    req->send_reply(HTTP_OK, "Everything is find", buf);
+    req->send_reply(HTTP_OK, "Everything is find", std::move(buf));
 }
 
 static void http_delay_reply(std::shared_ptr<time_event> ev, shared_ptr<http_request> req)
@@ -122,27 +122,26 @@ void http_large_delay_cb(std::shared_ptr<http_request> req)
 void http_dispatcher_cb(std::shared_ptr<http_request> req)
 {
     cerr << __func__ << " called!!!\n";
-    std::shared_ptr<buffer> buf = std::make_shared<buffer>();
+    auto buf = std::make_unique<buffer>();
     buf->push_back_string("dispatcher-test");
 
-    req->send_reply(HTTP_OK, "Everything is find", buf);
+    req->send_reply(HTTP_OK, "Everything is find", std::move(buf));
 }
 
 void http_keep_alive_cb(std::shared_ptr<http_request> req)
 {
     cerr << __func__ << " called!!!\n";
-    std::shared_ptr<buffer> buf = std::make_shared<buffer>();
-    
+    auto buf = std::make_unique<buffer>();
     cout<<req->uri<<endl;
 
-    req->send_reply(HTTP_OK, "Everything is find", buf);
+    req->send_reply(HTTP_OK, "Everything is find", std::move(buf));
 }
 
 static shared_ptr<http_server> http_setup()
 {
     cout << __func__ << endl;
     auto server = make_shared<http_server>();
-    server->resize_thread_pool(4);
+    server->resize_thread_pool(1);
     server->set_timeout(10);
 
     server->set_handle_cb("/test", http_test_cb);

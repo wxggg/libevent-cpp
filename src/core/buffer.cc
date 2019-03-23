@@ -68,7 +68,7 @@ int buffer::push_back(void *data, size_t datlen)
     return 0;
 }
 
-int buffer::push_back_buffer(std::shared_ptr<buffer> inbuf, int datlen)
+int buffer::push_back_buffer(std::unique_ptr<buffer> &inbuf, int datlen)
 {
     if (!inbuf)
         return 0;

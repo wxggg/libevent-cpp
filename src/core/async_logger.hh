@@ -16,39 +16,35 @@ class time_event;
 class rw_event;
 class async_logger
 {
-  private:
-    std::shared_ptr<buffer> input;
-    std::shared_ptr<buffer> output;
+private:
+  std::unique_ptr<buffer> input;
 
-    lock_queue<std::shared_ptr<buffer>> emptyQueue;
+  lock_queue<std::unique_ptr<buffer>> emptyQueue;
+  lock_queue<std::unique_ptr<buffer>> outputQueue;
 
-    lock_queue<std::shared_ptr<buffer>> inputQueue;
-    lock_queue<std::shared_ptr<buffer>> outputQueue;
+  std::unique_ptr<std::thread> logThread;
 
-    std::unique_ptr<std::thread> logThread;
+  bool running;
+  std::mutex input_mutex;
+  
+  std::mutex mutex;
+  std::condition_variable cv;
 
-    bool running;
-    std::mutex mutex;
-    std::mutex input_mutex;
-    std::mutex output_mutex;
-    std::mutex no_use_mutex;
-    std::condition_variable cv;
+  std::string logFile = "default.log";
 
-    std::string logFile = "default.log";
+  std::ofstream out;
 
-    std::ofstream out;
+public:
+  async_logger();
+  ~async_logger();
 
-  public:
-    async_logger();
-    ~async_logger();
+  void set_log_file(const std::string &file);
 
-    void set_log_file(const std::string &file);
+  void append(const std::string &line);
 
-    void append(const std::string &line);
-
-  private:
-    std::shared_ptr<buffer> get_empty_buffer();
-    void gather();
+private:
+  std::unique_ptr<buffer> get_empty_buffer();
+  void gather();
 };
 
 } // namespace eve

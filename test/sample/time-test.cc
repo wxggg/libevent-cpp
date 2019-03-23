@@ -1,6 +1,8 @@
 #include <time_event.hh>
 #include <select_base.hh>
 #include <poll_base.hh>
+#include <signal_event.hh>
+
 #include <iostream>
 
 using namespace std;
@@ -16,6 +18,10 @@ void timeout_cb(std::shared_ptr<time_event> ev)
 	ev->get_base()->add_event(ev);
 }
 
+void signal_cb(std::shared_ptr<signal_event> ev)
+{
+	ev->get_base()->set_terminated();
+}
 
 int main(int argc, char **argv)
 {
@@ -26,6 +32,10 @@ int main(int argc, char **argv)
 	base->register_callback(ev, timeout_cb, ev);
 	ev->set_timer(5, 0);
 	base->add_event(ev);
+
+	auto sev = create_event<signal_event>(base, SIGINT);
+	base->register_callback(sev, signal_cb, sev);
+	base->add_event(sev);
 
 	base->loop();
 }

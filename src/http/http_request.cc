@@ -19,8 +19,8 @@ http_request::http_request(std::shared_ptr<http_connection> conn)
 {
     this->kind = RESPONSE; // defualt is RESPONSE
 
-    input_buffer = std::make_shared<buffer>();
-    output_buffer = std::make_shared<buffer>();
+    input_buffer = std::make_unique<buffer>();
+    output_buffer = std::make_unique<buffer>();
 }
 
 http_request::~http_request()
@@ -45,13 +45,13 @@ void http_request::send_error(int error, std::string reason)
     err_page += "<p>Invalid method in request</p>\n";
     err_page += "</body></html>\n";
 
-    auto buf = std::make_shared<buffer>();
+    auto buf = std::make_unique<buffer>();
     buf->push_back_string(err_page);
 
     this->input_headers["Connection"] = "close";
     this->set_response(error, reason);
 
-    send_page(buf);
+    send_page(std::move(buf));
 }
 
 void http_request::send_not_found()
@@ -64,15 +64,15 @@ void http_request::send_not_found()
     not_found_page += "<p>The requested URL " + urihtml + " was not found on this server.</p>";
     not_found_page += "</body></html>\n";
 
-    auto buf = std::make_shared<buffer>();
+    auto buf = std::make_unique<buffer>();
     buf->push_back_string(not_found_page);
 
     this->set_response(HTTP_NOTFOUND, "Not Found");
 
-    send_page(buf);
+    send_page(std::move(buf));
 }
 
-void http_request::send_page(std::shared_ptr<buffer> buf)
+void http_request::send_page(std::unique_ptr<buffer> buf)
 {
     if (!major || !minor)
         major = minor = 1;
@@ -84,13 +84,13 @@ void http_request::send_page(std::shared_ptr<buffer> buf)
     output_headers["Content-Type"] = "text/html; charset=utf-8";
     output_headers["Connection"] = "close";
 
-    __send(buf);
+    __send(std::move(buf));
 }
 
-void http_request::send_reply(int code, const std::string &reason, std::shared_ptr<buffer> buf)
+void http_request::send_reply(int code, const std::string &reason, std::unique_ptr<buffer> buf)
 {
     set_response(code, reason);
-    __send(buf);
+    __send(std::move(buf));
 }
 
 void http_request::send_reply_start(int code, const std::string &reason)
@@ -105,7 +105,7 @@ void http_request::send_reply_start(int code, const std::string &reason)
     get_connection()->start_write();
 }
 
-void http_request::send_reply_chunk(std::shared_ptr<buffer> buf)
+void http_request::send_reply_chunk(std::unique_ptr<buffer> buf)
 {
     std::cerr << "[R] " << __func__ << " buf-length=" << buf->get_length() << std::endl;
     if (chunked)
@@ -132,7 +132,7 @@ void http_request::send_reply_end()
 }
 
 enum message_read_status
-http_request::parse_firstline(std::shared_ptr<buffer> buf)
+http_request::parse_firstline(std::unique_ptr<buffer> &buf)
 {
     std::string line = buf->readline();
     if (line.empty())
@@ -158,7 +158,7 @@ http_request::parse_firstline(std::shared_ptr<buffer> buf)
 }
 
 enum message_read_status
-http_request::parse_headers(std::shared_ptr<buffer> buf)
+http_request::parse_headers(std::unique_ptr<buffer> &buf)
 {
     std::string line;
     // enum message_read_status status = MORE_DATA_EXPECTED;
@@ -199,7 +199,7 @@ http_request::parse_headers(std::shared_ptr<buffer> buf)
 }
 
 enum message_read_status
-http_request::handle_chunked_read(std::shared_ptr<buffer> buf)
+http_request::handle_chunked_read(std::unique_ptr<buffer> &buf)
 {
     std::string line;
     while (buf->get_length() > 0)
@@ -288,7 +288,7 @@ void http_request::make_header()
     }
 }
 
-void http_request::__send(std::shared_ptr<buffer> databuf)
+void http_request::__send(std::unique_ptr<buffer> databuf)
 {
     this->output_buffer->push_back_buffer(databuf, -1);
 

@@ -81,7 +81,7 @@ class event_base
 
 	int add_event(const std::shared_ptr<event> &ev);
 	int remove_event(const std::shared_ptr<event> &ev);
-	void clean_event(const std::shared_ptr<event> &ev);
+	void clean_rw_event(const std::shared_ptr<rw_event> &ev);
 
 	template <typename E, typename F, typename... Rest>
 	decltype(auto) register_callback(E &&e, F &&f, Rest &&... rest)

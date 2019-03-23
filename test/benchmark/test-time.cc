@@ -11,7 +11,7 @@ using namespace eve;
 void time_cb(std::shared_ptr<time_event> ev)
 {
     cout << "id=" << ev->id << "  timeout=" << ev->timeout.tv_sec <<" usec="<<ev->timeout.tv_usec << endl;
-    ev->get_base()->clean_event(ev);
+    ev->get_base()->remove_event(ev);
 }
 
 int main(int argc, char const *argv[])

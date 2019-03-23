@@ -45,16 +45,23 @@ void http_server::resize_thread_pool(int nThreads)
     }
 }
 
+
+
 static void __listen_cb(int fd, http_server *server)
 {
-    // std::cout << __func__ << std::endl;
-
     std::string host;
     int port;
     int nfd = accept_socket(fd, host, port);
     LOG << "[server] ===> new client in with fd=" << nfd << " hostname=" << host << " portname=" << port << "\n";
-    auto cinfo = std::make_shared<http_client_info>(nfd, host, port);
-    server->clientQueue.push(cinfo);
+
+    server->clientQueue.push(std::make_shared<http_client_info>(nfd, host, port));
+
+    // auto conn = server->get_empty_connection();
+    // conn->set_fd(nfd);
+    // conn->clientaddress = host;
+    // conn->clientport = port;
+
+    // server->connectionQueue.push(conn);
     server->wakeup_random(2);
 }
 /*

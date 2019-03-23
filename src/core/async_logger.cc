@@ -10,14 +10,14 @@ namespace eve
 
 async_logger::async_logger()
 {
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 2; i++)
     {
-        auto buf = std::make_shared<buffer>();
-        buf->resize(4096);
-        inputQueue.push(buf);
+        auto buf = std::make_unique<buffer>();
+        buf->resize(4 * 1024 * 1024);
+        emptyQueue.push(std::move(buf));
     }
 
-    inputQueue.pop(input);
+    emptyQueue.pop(input);
 
     out.open(logFile);
 
@@ -44,13 +44,14 @@ void async_logger::set_log_file(const std::string &file)
     out.open(logFile);
 }
 
-std::shared_ptr<buffer> async_logger::get_empty_buffer()
+std::unique_ptr<buffer> async_logger::get_empty_buffer()
 {
-    std::shared_ptr<buffer> buf;
-    if (emptyQueue.pop(buf) == false)
+    std::unique_ptr<buffer> buf;
+    emptyQueue.pop(buf);
+    if (!buf)
     {
-        buf = std::make_shared<buffer>();
-        buf->resize(4096);
+        buf = std::unique_ptr<buffer>();
+        buf->resize(4 * 1024 * 1024);
     }
     return buf;
 }
@@ -59,9 +60,9 @@ void async_logger::append(const std::string &line)
 {
     Lock lock(input_mutex);
     input->push_back_string(line);
-    if (input->get_length() > 4000)
+    if (input->get_length() > 4 * 1000 * 1000)
     {
-        outputQueue.push(input);
+        outputQueue.push(std::move(input));
         input = get_empty_buffer();
         cv.notify_all();
     }
@@ -71,35 +72,32 @@ void async_logger::gather()
 {
     assert(running);
 
-    static int i = 0;
     while (running || !outputQueue.empty())
     {
         if (outputQueue.empty())
         {
-            Lock lock(no_use_mutex); // no other thread use this mutex
-            cv.wait_for(lock, std::chrono::seconds(2));
+            Lock lock(mutex); // no other thread use this mutex
+            cv.wait_for(lock, std::chrono::seconds(3));
             if (outputQueue.empty())
             {
                 {
                     Lock lock(input_mutex);
                     if (input->get_length() > 0)
                     {
-                        output = input;
-                        input = get_empty_buffer();
+                        out.write(input->get_data(), input->get_length());
+                        input->reset();
                     }
                 }
-                out.write(output->get_data(), output->get_length());
-                output->reset();
-                emptyQueue.push(output);
             }
         }
         else
         {
+            std::unique_ptr<buffer> output;
             while (outputQueue.pop(output))
             {
                 out.write(output->get_data(), output->get_length());
                 output->reset();
-                emptyQueue.push(output);
+                emptyQueue.push(std::move(output));
             }
         }
         out.flush();
@@ -108,6 +106,7 @@ void async_logger::gather()
     if (input->get_length() > 0)
     {
         out.write(input->get_data(), input->get_length());
+        input->reset();
         out.flush();
     }
     out.close();

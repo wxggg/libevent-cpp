@@ -56,8 +56,7 @@ class thread_pool
 	{
 		auto tsk = std::make_shared<std::packaged_task<decltype(f(rest...))()>>(
 			std::bind(std::forward<F>(f), std::forward<Rest>(rest)...));
-		auto t = new Task([tsk]() { (*tsk)(); });
-		taskQueue.push(t);
+		taskQueue.push(new Task([tsk]() { (*tsk)(); }));
 
 		Lock lock(mutex);
 		cv.notify_one();

@@ -16,10 +16,10 @@ class lock_queue
     std::queue<T> q;
 
   public:
-    bool push(const T &v)
+    bool push(T &&v)
     {
         Lock lock(mutex);
-        q.push(v);
+        q.push(std::move(v));
         return true;
     }
 
@@ -28,7 +28,7 @@ class lock_queue
         Lock lock(mutex);
         if (q.empty())
             return false;
-        v = q.front();
+        v = std::move(q.front());
         q.pop();
         return true;
     }

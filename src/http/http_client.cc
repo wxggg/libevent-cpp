@@ -21,7 +21,10 @@ std::shared_ptr<http_client_connection> http_client::make_connection(
     conn->servport = port;
 
     if (conn->connect() == -1)
-        return nullptr;
+    {
+        LOG_ERROR << "client connect to fd=" << fd << " error";
+        exit(-1);
+    }
     return conn;
 }
 

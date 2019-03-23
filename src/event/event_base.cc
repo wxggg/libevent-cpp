@@ -32,6 +32,7 @@ event_base::event_base()
 
 int event_base::add_event(const std::shared_ptr<event> &ev)
 {
+	ev->alive = true;
 	if (std::dynamic_pointer_cast<signal_event>(ev))
 	{
 		auto sigev = std::dynamic_pointer_cast<signal_event>(ev);
@@ -63,8 +64,11 @@ int event_base::add_event(const std::shared_ptr<event> &ev)
 
 int event_base::remove_event(const std::shared_ptr<event> &ev)
 {
+	if (ev->alive == false)
+		return 1;
 	if (std::dynamic_pointer_cast<signal_event>(ev))
 	{
+		ev->alive = false;
 		auto sigev = std::dynamic_pointer_cast<signal_event>(ev);
 		signalList.remove(sigev);
 		sigdelset(&evsigmask, sigev->sig);
@@ -72,6 +76,7 @@ int event_base::remove_event(const std::shared_ptr<event> &ev)
 	}
 	else if (std::dynamic_pointer_cast<time_event>(ev))
 	{
+		ev->alive = false;
 		auto tev = std::dynamic_pointer_cast<time_event>(ev);
 		timeSet.erase(tev);
 		return 0;
@@ -79,9 +84,15 @@ int event_base::remove_event(const std::shared_ptr<event> &ev)
 	else if (std::dynamic_pointer_cast<rw_event>(ev))
 	{
 		auto rw = std::dynamic_pointer_cast<rw_event>(ev);
+		if (fdMapRw.count(rw->fd) == 0)
+			return 0;
+		int res = del(rw);
 		if (rw->is_removeable())
+		{
 			fdMapRw.erase(rw->fd);
-		return del(rw);
+			rw->alive = false;
+		}
+		return res;
 	}
 	else
 	{
@@ -90,10 +101,13 @@ int event_base::remove_event(const std::shared_ptr<event> &ev)
 	}
 }
 
-void event_base::clean_event(const std::shared_ptr<event> &ev)
+void event_base::clean_rw_event(const std::shared_ptr<rw_event> &ev)
 {
+	ev->disable_read();
+	ev->disable_write();
 	remove_event(ev);
-	callbackMap.erase(ev->id);
+	ev->alive = false;
+	// callbackMap.erase(ev->id);
 }
 
 void event_base::activate(std::shared_ptr<event> ev, short ncalls)
@@ -252,13 +266,17 @@ void event_base::process_active_events()
 	{
 		auto ev = q.front();
 		q.pop();
-		while (ev->ncalls)
+
+		auto f = callbackMap[ev->id];
+		if (f)
 		{
-			--ev->ncalls;
-			auto f = callbackMap[ev->id];
-			if (f)
+			while (ev->ncalls)
+			{
+				--ev->ncalls;
 				(*f)();
+			}
 		}
+
 		ev->clear_active();
 	}
 }

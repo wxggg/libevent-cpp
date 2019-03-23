@@ -46,7 +46,7 @@ class buffer
 
 	/* push_back and pop_front */
 	int push_back(void *data, size_t datlen);
-	int push_back_buffer(std::shared_ptr<buffer> inbuf, int datlen);
+	int push_back_buffer(std::unique_ptr<buffer> &inbuf, int datlen);
 	inline int push_back_string(const std::string &s)
 	{
 		return push_back((void *)s.c_str(), s.size());

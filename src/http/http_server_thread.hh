@@ -6,6 +6,7 @@
 #include <logger.hh>
 
 #include <list>
+#include <queue>
 
 namespace eve
 {
@@ -17,6 +18,7 @@ private:
   std::weak_ptr<http_server> server;
   std::shared_ptr<rw_event> waker;
   std::list<std::shared_ptr<http_server_connection>> connectionList;
+  std::queue<std::shared_ptr<http_server_connection>> emptyQueue;
 
 public:
   http_server_thread(std::shared_ptr<http_server> server)
@@ -30,7 +32,7 @@ public:
   }
   ~http_server_thread()
   {
-    base->clean_event(waker);
+    base->clean_rw_event(waker);
   }
 
   auto get_server()
@@ -46,6 +48,7 @@ public:
   void terminate();
 
 private:
+  std::shared_ptr<http_server_connection> get_empty_connection();
   static void get_connections(std::shared_ptr<rw_event> ev, http_server_thread *thread);
 };
 

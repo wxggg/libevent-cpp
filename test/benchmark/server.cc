@@ -9,13 +9,12 @@ using namespace eve;
 
 void home(shared_ptr<http_request> req)
 {
-    std::shared_ptr<buffer> buf = std::make_shared<buffer>();
+    auto buf = std::make_unique<buffer>();
     buf->push_back_string("This is funnyThis is funnyThis iunny");
 
     /* allow sending of an empty reply */
-    req->send_reply(HTTP_OK, "Everything is fine", req->input_headers["Empty"].empty() ? buf : nullptr);
+    req->send_reply(HTTP_OK, "Everything is fine", req->input_headers["Empty"].empty() ? std::move(buf) : nullptr);
 }
-
 
 int main(int argc, char const *argv[])
 {

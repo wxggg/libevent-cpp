@@ -11,8 +11,8 @@ namespace eve
 class buffer_event
 {
 protected:
-  std::shared_ptr<buffer> input = nullptr;
-  std::shared_ptr<buffer> output = nullptr;
+  std::unique_ptr<buffer> input;
+  std::unique_ptr<buffer> output;
   std::shared_ptr<rw_event> ev = nullptr;
 
   std::weak_ptr<event_base> base;
@@ -22,9 +22,6 @@ public:
   std::shared_ptr<Callback> eofcb = nullptr;
   std::shared_ptr<Callback> writecb = nullptr;
   std::shared_ptr<Callback> errorcb = nullptr;
-
-protected:
-  inline void set_fd(int fd) { ev->set_fd(fd); }
 
 public:
   buffer_event(std::shared_ptr<event_base> base, int fd);
@@ -58,13 +55,15 @@ public:
     errorcb = std::make_shared<Callback>([tsk]() { tsk(); });
   }
 
+  inline void set_fd(int fd) { ev->set_fd(fd); }
+
   inline int get_ibuf_length() const { return input->get_length(); }
   inline int get_obuf_length() const { return output->get_length(); }
   inline const char *get_ibuf_data() const { return input->get_data(); }
   inline const char *get_obuf_data() const { return output->get_data(); }
 
-  inline auto get_ibuf() { return input; }
-  inline auto get_obuf() { return output; }
+  inline auto &get_ibuf() { return input; }
+  inline auto &get_obuf() { return output; }
 
   decltype(auto) get_base()
   {
@@ -83,7 +82,6 @@ public:
   void add_write_event();
   void remove_read_event();
   void remove_write_event();
-  void clean_event();
 
   inline int write_out() { return output->writefd(ev->fd); }
   inline int read_in() { return input->readfd(ev->fd, -1); }
@@ -93,7 +91,7 @@ public:
     return output->push_back_string(s);
   }
 
-  inline void write_buffer(const std::shared_ptr<buffer> &buf)
+  inline void write_buffer(std::unique_ptr<buffer> &buf)
   {
     output->push_back_buffer(buf, buf->get_length());
   }
