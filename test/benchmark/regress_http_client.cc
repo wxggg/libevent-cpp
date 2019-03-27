@@ -15,7 +15,7 @@ using namespace eve;
 
 static int test_ok = 0;
 std::string host = "127.0.0.1";
-unsigned short port = 8102;
+unsigned short port = 9102;
 
 static const string CHUNKS[] = {
     "This is funny",
@@ -29,7 +29,8 @@ static void http_readcb(buffer_event *bev)
     {
         auto req = std::make_shared<http_request>(nullptr);
         req->kind = RESPONSE;
-        req->parse_firstline(bev->get_ibuf());
+        auto line = bev->get_ibuf()->readline();
+        req->parse_firstline(line);
         req->parse_headers(bev->get_ibuf());
         for (const auto &p : req->input_headers)
             cout << p.first << "\t===\t" << p.second << endl;
@@ -79,7 +80,7 @@ static void http_basic_test(void)
     base->loop();
 }
 
-static void http_request_done(std::shared_ptr<http_request> req)
+static void http_request_done(http_request *req)
 {
     cout << __func__ << endl;
     string what = "This is funny";
@@ -117,7 +118,7 @@ static void http_connection_test(int persistent)
     client->set_timeout(15);
 
     auto conn = client->make_connection(host, port);
-    auto req = make_shared<http_request>(conn);
+    auto req = make_unique<http_request>();
 
     req->output_headers["Host"] = "somehost";
     req->uri = "/test";
@@ -132,7 +133,7 @@ static void http_connection_test(int persistent)
     if (!persistent)
         req->output_headers["Connection"] = "close";
 
-    conn->make_request(req);
+    conn->make_request(std::move(req));
 
     client->run();
 }
@@ -143,7 +144,7 @@ static void close_detect_end()
     // base->set_terminated();
 }
 
-static void close_detect_done(std::shared_ptr<http_request> req)
+static void close_detect_done(http_request *req)
 {
     cout << __func__ << endl;
     // // cout<<"code="<<req->response_code<<endl;
@@ -153,36 +154,30 @@ static void close_detect_done(std::shared_ptr<http_request> req)
         exit(1);
     }
 
-    auto base = req->get_base();
+    auto base = req->conn->get_base();
     std::shared_ptr<time_event> tev = create_event<time_event>(base);
     tev->set_timer(3, 0);
     base->register_callback(tev, close_detect_end);
     base->add_event(tev);
 }
 
-std::weak_ptr<http_client_connection> delayed_conn;
+http_client_connection *delayed_conn;
 
 static void close_detect_launch()
 {
     cout << __func__ << endl;
-    auto conn = delayed_conn.lock();
-    if (!conn)
-    {
-        cerr << "FAILED with conn expired\n";
-        exit(1);
-    }
 
-    auto req = make_shared<http_request>(conn);
+    auto req = make_unique<http_request>();
     req->output_headers["Host"] = "somehost";
     req->type = REQ_GET;
     req->uri = "/test";
     req->set_cb(close_detect_done);
 
     // when detect if the connection is closed, the client send another request
-    conn->make_request(req);
+    delayed_conn->make_request(std::move(req));
 }
 
-static void close_detect_cb(std::shared_ptr<http_request> req)
+static void close_detect_cb(http_request *req)
 {
     cout << __func__ << endl;
     if (req != nullptr && req->response_code != HTTP_OK)
@@ -191,7 +186,7 @@ static void close_detect_cb(std::shared_ptr<http_request> req)
         exit(1);
     }
 
-    auto base = req->get_base();
+    auto base = req->conn->get_base();
     auto ev = create_event<time_event>(base);
     ev->set_timer(5, 0);
     base->register_callback(ev, close_detect_launch);
@@ -204,11 +199,11 @@ static void http_close_detection(int with_delay)
 
     auto client = make_shared<http_client>();
     auto conn = client->make_connection(host, port);
-    delayed_conn = conn;
+    delayed_conn = conn.get();
 
     client->set_timeout(2);
 
-    auto req = make_shared<http_request>(conn);
+    auto req = make_unique<http_request>();
     req->output_headers["Host"] = "somehost";
     req->type = REQ_GET;
     req->set_cb(close_detect_cb);
@@ -218,11 +213,11 @@ static void http_close_detection(int with_delay)
     else
         req->uri = "/test";
 
-    conn->make_request(req);
+    conn->make_request(std::move(req));
     client->run();
 }
 
-static void http_postrequest_done(shared_ptr<http_request> req)
+static void http_postrequest_done(http_request *req)
 {
     cout << __func__ << " called\n";
 
@@ -253,14 +248,14 @@ static void http_post_test(void)
 
     auto client = make_shared<http_client>();
     auto conn = client->make_connection(host, port);
-    auto req = make_shared<http_request>(conn);
+    auto req = make_unique<http_request>();
     req->output_headers["Host"] = "somehost";
     req->output_buffer->push_back_string("Okay. not really printf");
     req->uri = "/postit";
     req->type = REQ_POST;
     req->set_cb(http_postrequest_done);
 
-    conn->make_request(req);
+    conn->make_request(std::move(req));
     client->run();
 }
 
@@ -294,7 +289,7 @@ static void http_failure_test(void)
     base->loop();
 }
 
-static void http_dispatcher_test_done(shared_ptr<http_request> req)
+static void http_dispatcher_test_done(http_request *req)
 {
     cout << __func__ << " called\n";
 
@@ -327,13 +322,13 @@ static void http_dispatcher_test(void)
 
     auto client = make_shared<http_client>();
     auto conn = client->make_connection(host, port);
-    auto req = make_shared<http_request>(conn);
+    auto req = make_unique<http_request>();
     req->set_cb(http_dispatcher_test_done);
     req->output_headers["Host"] = "somehost";
     req->type = REQ_GET;
     req->uri = "/?arg=val";
 
-    conn->make_request(req);
+    conn->make_request(std::move(req));
 
     client->run();
 }
@@ -367,10 +362,10 @@ static void http_multi_line_header_test(void)
     base->loop();
 }
 
-static void http_request_bad(std::shared_ptr<http_request> req)
+static void http_request_bad(http_request *req)
 {
     cout << __func__ << endl;
-    req->get_base()->set_terminated();
+    req->conn->get_base()->set_terminated();
 }
 
 static void http_negative_content_length_test(void)
@@ -378,14 +373,14 @@ static void http_negative_content_length_test(void)
     cout << __func__ << endl;
     auto client = make_shared<http_client>();
     auto conn = client->make_connection(host, port);
-    auto req = make_shared<http_request>(conn);
+    auto req = make_unique<http_request>();
     req->set_cb(http_request_bad);
     req->output_headers["X-Negative"] = "makeitso";
     req->output_headers["Host"] = "somehost";
     req->type = REQ_GET;
     req->uri = "/test";
 
-    conn->make_request(req);
+    conn->make_request(std::move(req));
     client->run();
 }
 
@@ -437,7 +432,7 @@ static void http_chunked_test(void)
     base->loop();
 }
 
-static void request_chunked_done(shared_ptr<http_request> req)
+static void request_chunked_done(http_request *req)
 {
     cout << __func__ << " called\n";
     if (req->input_buffer->find_string(CHUNKS[2]) != nullptr)
@@ -451,7 +446,7 @@ static void http_chunked_handle_test(void)
     cout << __func__ << endl;
     auto client = make_shared<http_client>();
     auto conn = client->make_connection(host, port);
-    auto req = make_shared<http_request>(conn);
+    auto req = make_unique<http_request>();
 
     req->set_cb(request_chunked_done);
     req->output_headers["Connection"] = "close";
@@ -459,16 +454,15 @@ static void http_chunked_handle_test(void)
     req->type = REQ_GET;
     req->uri = "/chunked";
 
-    conn->make_request(req);
+    conn->make_request(std::move(req));
     client->run();
 }
 
 static int count_req = 1;
-static void keep_alive_cb(shared_ptr<http_request> req)
+static void keep_alive_cb(http_request *req)
 {
     cout << "count=" << count_req++ << endl;
-    cout<<req->input_buffer->get_data()<<endl;
-    cout<<req->uri<<endl;
+    cout << req->input_buffer->get_data() << endl;
 }
 
 static void http_keepalive_test(void)
@@ -477,21 +471,25 @@ static void http_keepalive_test(void)
     auto client = make_shared<http_client>();
     auto conn = client->make_connection(host, port);
 
-    vector<shared_ptr<http_request>> reqs;
-
     for (int i = 0; i < 20; i++)
     {
-        auto req = make_shared<http_request>(conn);
+        auto req = make_unique<http_request>();
 
         req->set_cb(keep_alive_cb);
         req->output_headers["Connection"] = "keep-alive";
         req->output_headers["Host"] = "somehost";
         req->type = REQ_GET;
-        req->uri = "/keep/"+to_string(i);
+        req->uri = "/keep/" + to_string(i);
 
-        conn->make_request(req);
-        reqs.push_back(req);
+        conn->make_request(std::move(req));
     }
+
+    auto req = make_unique<http_request>();
+
+    req->set_cb(keep_alive_cb);
+    req->output_headers["Connection"] = "close";
+    req->type = REQ_GET;
+    conn->make_request(std::move(req));
 
     client->run();
 }

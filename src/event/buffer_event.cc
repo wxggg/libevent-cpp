@@ -24,10 +24,8 @@ size_t buffer_event::write(void *data, size_t size)
         return -1;
 
     if (size > 0)
-    {
-        ev->enable_write();
-        get_base()->add_event(ev);
-    }
+        add_write_event();
+
     return res;
 }
 

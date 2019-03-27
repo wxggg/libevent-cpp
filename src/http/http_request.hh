@@ -50,7 +50,7 @@ class http_request
 {
   private:
   public:
-    std::weak_ptr<http_connection> conn;
+    http_connection *conn;
     std::unique_ptr<buffer> input_buffer;
     std::unique_ptr<buffer> output_buffer;
     int flags;
@@ -76,16 +76,19 @@ class http_request
     long ntoread;
     int chunked = 0;
 
-    // void (*cb)(std::shared_ptr<http_request>) = nullptr;
-    std::function<void(std::shared_ptr<http_request>)> cb = nullptr;
-    // void (*chunk_cb)(std::shared_ptr<http_request>);
+    // void (*cb)(http_request *) = nullptr;
+    std::function<void(http_request *)> cb = nullptr;
+    // void (*chunk_cb)(http_request *);
 
     std::map<std::string, std::string> input_headers;
     std::map<std::string, std::string> output_headers;
 
   public:
-    http_request(std::shared_ptr<http_connection> conn);
+    http_request();
+    http_request(http_connection *conn);
     ~http_request();
+
+    void reset();
 
     inline void set_response(int code, const std::string &reason)
     {
@@ -94,17 +97,7 @@ class http_request
         this->response_code_line = reason;
     }
 
-    inline void set_cb(void (*cb)(std::shared_ptr<http_request>)) { this->cb = cb; }
-
-    std::shared_ptr<event_base> get_base();
-
-    decltype(auto) get_connection()
-    {
-        auto c = conn.lock();
-        if (!c)
-            std::cerr << "error connection is expired\n";
-        return c;
-    }
+    inline void set_cb(void (*cb)(http_request *)) { this->cb = cb; }
 
     inline int is_connection_keepalive()
     {
@@ -145,7 +138,7 @@ class http_request
 
     int get_body_length();
 
-    enum message_read_status parse_firstline(std::unique_ptr<buffer> &buf);
+    enum message_read_status parse_firstline(const std::string &line);
     enum message_read_status parse_headers(std::unique_ptr<buffer> &buf);
     enum message_read_status handle_chunked_read(std::unique_ptr<buffer> &buf);
 

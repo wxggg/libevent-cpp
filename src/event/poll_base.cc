@@ -14,6 +14,7 @@ int poll_base::recalc()
 
 void poll_base::poll_check()
 {
+    LOG_DEBUG;
     int fd = -1;
     for (auto kv : fd_map_poll)
     {

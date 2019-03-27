@@ -13,35 +13,35 @@
 
 namespace eve
 {
-using HandleCallBack = std::function<void(std::shared_ptr<http_request>)>;
+using HandleCallBack = std::function<void(http_request *)>;
 
 class rw_event;
 class epoll_base;
 
 class http_client_info
 {
-  public:
+public:
 	int nfd;
 	int port;
 	std::string host;
 
-  public:
+public:
 	http_client_info(int nfd, std::string host, int port) : nfd(nfd), port(port), host(host) {}
 };
 
-class http_server : public std::enable_shared_from_this<http_server>
+class http_server
 {
-  private:
+private:
 	std::shared_ptr<thread_pool> pool = nullptr;
 	std::shared_ptr<event_base> base = nullptr;
-	std::vector<std::shared_ptr<http_server_thread>> threads;
+	std::vector<std::unique_ptr<http_server_thread>> threads;
 
-  public:
+public:
 	int timeout = -1;
 
-	lock_queue<std::shared_ptr<http_client_info>> clientQueue;
+	lock_queue<std::unique_ptr<http_client_info>> clientQueue;
 
-	std::function<void(std::shared_ptr<http_request>)> gencb = nullptr;
+	std::function<void(http_request *)> gencb = nullptr;
 
 	std::map<std::string, HandleCallBack> handle_callbacks;
 
@@ -50,7 +50,7 @@ class http_server : public std::enable_shared_from_this<http_server>
 
 	std::mutex mutex;
 
-  public:
+public:
 	http_server()
 	{
 		base = std::make_shared<epoll_base>();
@@ -89,7 +89,7 @@ class http_server : public std::enable_shared_from_this<http_server>
 			wakeup(i);
 	}
 
-  private:
+private:
 };
 
 } // namespace eve

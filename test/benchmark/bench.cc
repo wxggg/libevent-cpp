@@ -5,7 +5,6 @@
 
 #include <sys/resource.h>
 #include <unistd.h>
-#include <assert.h>
 
 #include <vector>
 

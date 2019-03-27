@@ -12,14 +12,14 @@ namespace eve
 http_server::~http_server()
 {
     std::cout << __func__ << std::endl;
-    for (int i = 0; i < threads.size(); i++)
+    for (int i = 0; i < static_cast<int>(threads.size()); i++)
     {
         threads[i]->terminate();
         threads[i]->wakeup();
     }
 }
 
-static void loop_task(std::shared_ptr<http_server_thread> thread)
+static void loop_task(http_server_thread *thread)
 {
     thread->loop();
 }
@@ -31,21 +31,16 @@ void http_server::resize_thread_pool(int nThreads)
     if (currentThreads <= nThreads)
     {
         for (int i = currentThreads; i < nThreads; i++)
-        {
-            auto thread = std::make_shared<http_server_thread>(shared_from_this());
-            threads.push_back(thread);
-        }
+            threads.push_back(std::make_unique<http_server_thread>(this));
     }
     else
         threads.resize(nThreads);
 
     for (int i = 0; i < nThreads; i++)
     {
-        pool->push(loop_task, threads[i]);
+        pool->push(loop_task, threads[i].get());
     }
 }
-
-
 
 static void __listen_cb(int fd, http_server *server)
 {
@@ -54,14 +49,7 @@ static void __listen_cb(int fd, http_server *server)
     int nfd = accept_socket(fd, host, port);
     LOG << "[server] ===> new client in with fd=" << nfd << " hostname=" << host << " portname=" << port << "\n";
 
-    server->clientQueue.push(std::make_shared<http_client_info>(nfd, host, port));
-
-    // auto conn = server->get_empty_connection();
-    // conn->set_fd(nfd);
-    // conn->clientaddress = host;
-    // conn->clientport = port;
-
-    // server->connectionQueue.push(conn);
+    server->clientQueue.push(std::make_unique<http_client_info>(nfd, host, port));
     server->wakeup_random(2);
 }
 /*
@@ -94,7 +82,7 @@ int http_server::start(const std::string &address, unsigned short port)
 
 void http_server::wakeup(int i)
 {
-    if (i > threads.size())
+    if (i > static_cast<int>(threads.size()))
         return;
     threads[i]->wakeup();
 }

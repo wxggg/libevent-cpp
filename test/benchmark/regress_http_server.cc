@@ -13,9 +13,9 @@ using namespace std;
 using namespace eve;
 
 std::string host = "127.0.0.1";
-unsigned short port = 8102;
+unsigned short port = 9102;
 
-void http_test_cb(std::shared_ptr<http_request> req)
+void http_test_cb(http_request *req)
 {
     cerr << __func__ << " called\n";
     auto buf = std::make_unique<buffer>();
@@ -44,7 +44,7 @@ static const string CHUNKS[] = {
 
 struct chunk_req_state
 {
-    shared_ptr<http_request> req;
+    http_request *req;
     int i;
 };
 
@@ -68,7 +68,7 @@ http_chunked_trickle_cb(std::shared_ptr<time_event> ev, struct chunk_req_state *
     }
 }
 
-void http_chunked_cb(std::shared_ptr<http_request> req)
+void http_chunked_cb(http_request *req)
 {
     cerr << __func__ << " called!!\n";
 
@@ -78,14 +78,14 @@ void http_chunked_cb(std::shared_ptr<http_request> req)
 
     req->send_reply_start(HTTP_OK, "Everything is fine");
 
-    auto base = req->get_base();
+    auto base = req->conn->get_base();
     std::shared_ptr<time_event> tev = create_event<time_event>(base);
     tev->set_timer(0, 0);
     base->register_callback(tev, http_chunked_trickle_cb, tev, state);
     base->add_event(tev);
 }
 
-void http_post_cb(std::shared_ptr<http_request> req)
+void http_post_cb(http_request *req)
 {
     cout << __func__ << " called\n";
 
@@ -103,23 +103,23 @@ void http_post_cb(std::shared_ptr<http_request> req)
     req->send_reply(HTTP_OK, "Everything is find", std::move(buf));
 }
 
-static void http_delay_reply(std::shared_ptr<time_event> ev, shared_ptr<http_request> req)
+static void http_delay_reply(std::shared_ptr<time_event> ev, http_request *req)
 {
     cerr << __func__ << " called" << endl;
     req->send_reply(HTTP_OK, "Everything is fine", nullptr);
 }
 
-void http_large_delay_cb(std::shared_ptr<http_request> req)
+void http_large_delay_cb(http_request *req)
 {
     cerr << __func__ << " called!!!\n";
-    auto base = req->get_base();
+    auto base = req->conn->get_base();
     auto ev = create_event<time_event>(base);
     ev->set_timer(3, 0);
     base->register_callback(ev, http_delay_reply, ev, req);
     base->add_event(ev);
 }
 
-void http_dispatcher_cb(std::shared_ptr<http_request> req)
+void http_dispatcher_cb(http_request *req)
 {
     cerr << __func__ << " called!!!\n";
     auto buf = std::make_unique<buffer>();
@@ -128,19 +128,20 @@ void http_dispatcher_cb(std::shared_ptr<http_request> req)
     req->send_reply(HTTP_OK, "Everything is find", std::move(buf));
 }
 
-void http_keep_alive_cb(std::shared_ptr<http_request> req)
+void http_keep_alive_cb(http_request *req)
 {
     cerr << __func__ << " called!!!\n";
     auto buf = std::make_unique<buffer>();
-    cout<<req->uri<<endl;
+    cout << req->uri << endl;
+    buf->push_back_string(req->uri);
 
-    req->send_reply(HTTP_OK, "Everything is find", std::move(buf));
+    req->send_reply(HTTP_OK, "Everything is fine", std::move(buf));
 }
 
-static shared_ptr<http_server> http_setup()
+static unique_ptr<http_server> http_setup()
 {
     cout << __func__ << endl;
-    auto server = make_shared<http_server>();
+    auto server = make_unique<http_server>();
     server->resize_thread_pool(1);
     server->set_timeout(10);
 
@@ -151,7 +152,6 @@ static shared_ptr<http_server> http_setup()
     server->set_handle_cb("/", http_dispatcher_cb);
     server->set_handle_cb("/keep/*", http_keep_alive_cb);
 
-    server->start(host, port);
     return server;
 }
 

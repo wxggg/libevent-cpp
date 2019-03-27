@@ -3,7 +3,6 @@
 #include <util_network.hh>
 #include <logger.hh>
 
-#include <assert.h>
 #include <sys/socket.h>
 
 #include <algorithm>
@@ -24,7 +23,7 @@ static void write_timeout_cb(http_server_connection *conn)
 }
 
 http_server_connection::http_server_connection(
-    std::shared_ptr<event_base> base, int fd, std::shared_ptr<http_server> server)
+    std::shared_ptr<event_base> base, int fd, http_server *server)
     : http_connection(base, fd), server(server)
 {
     base->register_callback(readTimer, read_timeout_cb, this);
@@ -47,6 +46,8 @@ void http_server_connection::fail(http_connection_error error)
     switch (error)
     {
     case HTTP_TIMEOUT:
+        close(1);
+        return;
     case HTTP_EOF:
         /* 
          * these are cases in which we probably should just
@@ -54,12 +55,12 @@ void http_server_connection::fail(http_connection_error error)
          * case may happen when a browser keeps a persistent
          * connection open and we timeout on the read.
          */
-        close();
+        close(0);
         return;
     case HTTP_INVALID_HEADER:
     default: /* xxx: probably should just error on default */
              /* the callback looks at the uri to determine errors */
-        auto req = requests.front();
+        auto req = current_request();
         if (!req)
             return;
         if (!req->uri.empty())
@@ -77,9 +78,9 @@ void http_server_connection::fail(http_connection_error error)
 
 void http_server_connection::do_read_done()
 {
-    assert(state != CLOSED);
-
-    auto req = requests.front();
+    auto req = current_request();
+    if (!req)
+        return;
     if (req->handled)
     {
         fail(HTTP_EOF);
@@ -93,16 +94,14 @@ void http_server_connection::do_read_done()
 
 int http_server_connection::associate_new_request()
 {
-    assert(state != CLOSED);
-
-    auto req = std::make_shared<http_request>(shared_from_this());
+    auto req = get_empty_request();
     req->flags |= REQ_OWN_CONNECTION;
-
-    requests.push(req);
 
     req->kind = REQUEST;
     req->remote_host = clientaddress;
     req->remote_port = clientport;
+
+    requests.push(std::move(req));
 
     LOG << "<" << std::this_thread::get_id() << ">:"
         << " get request from " << clientaddress << ":" << clientport;
@@ -112,10 +111,8 @@ int http_server_connection::associate_new_request()
     return 0;
 }
 
-void http_server_connection::handle_request(std::shared_ptr<http_request> req)
+void http_server_connection::handle_request(http_request *req)
 {
-    assert(state != CLOSED);
-
     if (req->uri.empty())
     {
         req->send_error(HTTP_BADREQUEST, "Bad Request");
@@ -133,7 +130,6 @@ void http_server_connection::handle_request(std::shared_ptr<http_request> req)
         req->uri = req->uri.substr(0, offset);
     }
 
-    auto server = get_server();
     if (server->handle_callbacks.count(req->uri) > 0)
     {
         server->handle_callbacks.at(req->uri)(req);
@@ -147,7 +143,7 @@ void http_server_connection::handle_request(std::shared_ptr<http_request> req)
         if (v1.size() != v2.size())
             continue;
         bool flag = true;
-        for (int i = 0; i < v1.size(); i++)
+        for (int i = 0; i < static_cast<int>(v1.size()); i++)
             if (v1[i] != v2[i] && v1[i] != "*")
             {
                 flag = false;
@@ -172,22 +168,25 @@ void http_server_connection::handle_request(std::shared_ptr<http_request> req)
 
 void http_server_connection::do_write_done()
 {
-    assert(state != CLOSED);
-
-    auto req = requests.front();
+    auto req = current_request();
+    if (!req)
+        return;
     if (req->chunked == 1)
         return;
-    requests.pop();
 
-    if (req->is_connection_close())
+    bool need_close =req->is_connection_close();
+
+    pop_req();
+
+    if (need_close)
     {
-        close();
+        close(0);
         return;
     }
 
     /* we have a persistent connection; try to accept another request. */
     if (associate_new_request() == -1)
-        close();
+        close(1);
 }
 
 } // namespace eve

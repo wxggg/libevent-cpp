@@ -8,13 +8,21 @@
 #include <sstream>
 #include <vector>
 #include <iostream>
-#include <cassert>
 
 namespace eve
 {
 
 /** class http_request **/
-http_request::http_request(std::shared_ptr<http_connection> conn)
+
+http_request::http_request()
+{
+    this->kind = RESPONSE; // defualt is RESPONSE
+
+    input_buffer = std::make_unique<buffer>();
+    output_buffer = std::make_unique<buffer>();
+}
+
+http_request::http_request(http_connection *conn)
     : conn(conn)
 {
     this->kind = RESPONSE; // defualt is RESPONSE
@@ -28,12 +36,17 @@ http_request::~http_request()
     // std::cout << __func__ << std::endl;
 }
 
-std::shared_ptr<event_base> http_request::get_base()
+void http_request::reset()
 {
-    auto c = conn.lock();
-    if (c)
-        return c->get_base();
-    return nullptr;
+    input_buffer->reset();
+    output_buffer->reset();
+    uri = query = "";
+    handled = false;
+    cb = nullptr;
+    chunked = 0;
+    ntoread = 0;
+    std::map<std::string, std::string>().swap(input_headers);
+    std::map<std::string, std::string>().swap(output_headers);
 }
 
 void http_request::send_error(int error, std::string reason)
@@ -102,7 +115,7 @@ void http_request::send_reply_start(int code, const std::string &reason)
         chunked = 1;
     }
     make_header();
-    get_connection()->start_write();
+    conn->start_write();
 }
 
 void http_request::send_reply_chunk(std::unique_ptr<buffer> buf)
@@ -112,29 +125,29 @@ void http_request::send_reply_chunk(std::unique_ptr<buffer> buf)
     {
         std::stringstream ss;
         ss << std::hex << buf->get_length();
-        get_connection()->write_string(ss.str() + "\r\n");
+        conn->write_string(ss.str() + "\r\n");
     }
-    get_connection()->write_buffer(buf);
+    conn->write_buffer(buf);
     if (chunked)
-        get_connection()->write_string("\r\n");
+        conn->write_string("\r\n");
 
-    get_connection()->start_write();
+    conn->start_write();
 }
 
 void http_request::send_reply_end()
 {
     if (chunked)
     {
-        get_connection()->write_string("0\r\n\r\n");
-        get_connection()->start_write();
+        conn->write_string("0\r\n\r\n");
+        conn->start_write();
         chunked = 0;
     }
 }
 
 enum message_read_status
-http_request::parse_firstline(std::unique_ptr<buffer> &buf)
+http_request::parse_firstline(const std::string &line)
 {
-    std::string line = buf->readline();
+    LOG << line;
     if (line.empty())
         return MORE_DATA_EXPECTED;
 
@@ -274,9 +287,9 @@ void http_request::make_header()
         __make_header_response();
 
     for (const auto &kv : output_headers)
-        get_connection()->write_string(kv.first + ": " + kv.second + "\r\n");
+        conn->write_string(kv.first + ": " + kv.second + "\r\n");
 
-    get_connection()->write_string("\r\n");
+    conn->write_string("\r\n");
 
     if (this->output_buffer->get_length() > 0)
     {
@@ -284,7 +297,7 @@ void http_request::make_header()
 		 * For a request, we add the POST data, for a reply, this
 		 * is the regular data.
 		 */
-        get_connection()->write_buffer(output_buffer);
+        conn->write_buffer(output_buffer);
     }
 }
 
@@ -295,7 +308,7 @@ void http_request::__send(std::unique_ptr<buffer> databuf)
     /* Adds headers to the response */
     make_header();
 
-    get_connection()->start_write();
+    conn->start_write();
 }
 
 /**
@@ -403,7 +416,7 @@ void http_request::__make_header_request()
     }
 
     std::string str = method + " " + uri + " HTTP/" + std::to_string(major) + "." + std::to_string(minor) + "\r\n";
-    get_connection()->write_string(str);
+    conn->write_string(str);
 
     /* Add the content length on a post request if missing */
     if (type == REQ_POST && output_headers["Content-Length"].empty())
@@ -417,7 +430,7 @@ void http_request::__make_header_response()
 {
     int is_keepalive = is_connection_keepalive();
     std::string s = "HTTP/" + std::to_string(major) + "." + std::to_string(minor) + " " + std::to_string(response_code) + " " + response_code_line + "\r\n";
-    get_connection()->write_string(s);
+    conn->write_string(s);
 
     if (major == 1)
     {

@@ -7,7 +7,7 @@
 using namespace std;
 using namespace eve;
 
-void home(shared_ptr<http_request> req)
+void home(http_request * req)
 {
     auto buf = std::make_unique<buffer>();
     buf->push_back_string("This is funnyThis is funnyThis iunny");
@@ -19,7 +19,7 @@ void home(shared_ptr<http_request> req)
 int main(int argc, char const *argv[])
 {
     init_log_file("server.log");
-    auto server = make_shared<http_server>();
+    auto server = make_unique<http_server>();
     server->set_timeout(15);
 
     server->set_handle_cb("/", home);

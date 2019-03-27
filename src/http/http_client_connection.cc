@@ -4,8 +4,6 @@
 #include <util_linux.hh>
 #include <event_base.hh>
 
-#include <cassert>
-
 namespace eve
 {
 
@@ -31,11 +29,13 @@ http_client_connection::http_client_connection(std::shared_ptr<event_base> base,
 
 void http_client_connection::fail(http_connection_error error)
 {
-    auto req = requests.front();
+    auto req = current_request();
+    if (!req)
+        return;
     LOG_ERROR << " req->uri=" << req->uri << " with error=" << error;
 
-    this->requests.pop();
     /* xxx: maybe we should fail all requests??? */
+    pop_req();
 
     /* reset the connection */
     this->reset();
@@ -43,28 +43,22 @@ void http_client_connection::fail(http_connection_error error)
     /* We are trying the next request that was queued on us */
     if (!requests.empty())
         this->connect();
-
-    if (req->cb)
-        req->cb(req);
 }
 
 void http_client_connection::do_read_done()
 {
     remove_read_event();
-    if (requests.empty())
-        return;
-
-    auto req = requests.front();
-    requests.pop();
-
-    if (req->cb)
-        req->cb(req);
+    pop_req();
 
     if (!requests.empty())
     {
-        auto req = requests.front();
-        req->make_header();
-        start_write();
+        if (output->get_length() > 0)
+            start_write();
+        else
+        {
+            start_read();
+            requests.front()->kind = RESPONSE;
+        }
     }
 
     return;
@@ -72,14 +66,11 @@ void http_client_connection::do_read_done()
 
 void http_client_connection::do_write_done()
 {
-    if (requests.empty())
+    auto req = current_request();
+    if (!req)
         return;
-
-    assert(state == WRITING);
-
     start_read();
 
-    auto req = requests.front();
     req->kind = RESPONSE;
 }
 
@@ -101,25 +92,24 @@ int http_client_connection::connect()
     return 0;
 }
 
-int http_client_connection::make_request(std::shared_ptr<http_request> req)
+int http_client_connection::make_request(std::unique_ptr<http_request> req)
 {
-    req->conn = shared_from_this();
+    req->conn = this;
     req->kind = REQUEST;
 
     req->remote_host = servaddr;
     req->remote_port = servport;
 
-    requests.push(req);
-    // dispatch();
+    req->make_header();
+
+    requests.push(std::move(req));
     if (!is_connected())
     {
         if (this->connect() == -1)
             return -1;
     }
 
-    req->make_header();
     start_write();
-
     return 0;
 }
 

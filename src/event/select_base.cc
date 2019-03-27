@@ -32,6 +32,7 @@ select_base::~select_base()
 
 void select_base::check_fdset()
 {
+    LOG_DEBUG;
     bool iread = false, iwrite = false;
 
     for (auto kv : fdMapRw)

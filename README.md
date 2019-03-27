@@ -43,7 +43,7 @@ make -j4
 using namespace std;
 using namespace eve;
 
-void send_file(shared_ptr<http_request> req, string path)
+void send_file(http_request * req, string path)
 {
     std::ifstream ifs(path);
     if (!ifs)
@@ -59,12 +59,12 @@ void send_file(shared_ptr<http_request> req, string path)
     req->send_reply(HTTP_OK, "Everything is fine", req->input_headers["Empty"].empty() ? buf : nullptr);
 }
 
-void home(shared_ptr<http_request> req)
+void home(http_request * req)
 {
     send_file(req, "index.html");
 }
 
-void general_cb(shared_ptr<http_request> req)
+void general_cb(http_request * req)
 {
     string path = req->uri.substr(1);
     send_file(req, path);

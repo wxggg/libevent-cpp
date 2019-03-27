@@ -1,7 +1,6 @@
 #include <event.hh>
 #include <event_base.hh>
 
-#include <assert.h>
 #include <iostream>
 #include <iomanip>
 #include <iterator>

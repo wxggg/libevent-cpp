@@ -1,7 +1,6 @@
 #include <async_logger.hh>
 #include <buffer.hh>
 
-#include <assert.h>
 #include <string.h>
 #include <iostream>
 
@@ -70,8 +69,6 @@ void async_logger::append(const std::string &line)
 
 void async_logger::gather()
 {
-    assert(running);
-
     while (running || !outputQueue.empty())
     {
         if (outputQueue.empty())

@@ -6,7 +6,6 @@
 #include <iostream>
 #include <cstring>
 #include <string>
-#include <cassert>
 
 namespace eve
 {
@@ -45,10 +44,11 @@ http_connection::~http_connection()
     }
 }
 
-void http_connection::close()
+void http_connection::close(int op)
 {
-    if (get_obuf_length() > 0)
+    if (get_obuf_length() > 0 && op == 0)
     {
+        std::cout << "length=" << get_obuf_length() << ";";
         start_write();
         return;
     }
@@ -81,9 +81,25 @@ void http_connection::reset()
 
 void http_connection::start_read()
 {
-    assert(state != CLOSED);
-    add_read_event();
+    state = CLOSED;
     state = READING_FIRSTLINE;
+    if (input->get_length() > 0)
+        read_http();
+    else
+        add_read_and_timer();
+}
+
+void http_connection::start_write()
+{
+    if (get_obuf_length() <= 0)
+        return;
+    state = WRITING;
+    add_write_and_timer();
+}
+
+void http_connection::add_read_and_timer()
+{
+    add_read_event();
     if (timeout > 0)
     {
         readTimer->set_timer(timeout, 0);
@@ -91,13 +107,9 @@ void http_connection::start_read()
     }
 }
 
-void http_connection::start_write()
+void http_connection::add_write_and_timer()
 {
-    assert(state != CLOSED);
-    if (get_obuf_length() <= 0)
-        return;
     add_write_event();
-    state = WRITING;
     if (timeout > 0)
     {
         writeTimer->set_timer(timeout, 0);
@@ -117,9 +129,13 @@ void http_connection::remove_write_timer()
 
 /** private function **/
 
-void http_connection::read_firstline(std::shared_ptr<http_request> req)
+void http_connection::read_firstline()
 {
-    enum message_read_status res = req->parse_firstline(input);
+    auto req = current_request();
+    if (!req)
+        return;
+    auto line = input->readline();
+    enum message_read_status res = req->parse_firstline(line);
     if (res == DATA_CORRUPTED)
     {
         /* Error while reading, terminate */
@@ -129,17 +145,21 @@ void http_connection::read_firstline(std::shared_ptr<http_request> req)
     else if (res == MORE_DATA_EXPECTED)
     {
         /* Need more header lines */
-        add_read_event();
+        add_read_and_timer();
         return;
     }
 
     this->state = READING_HEADERS;
-    read_header(req);
+    read_header();
 }
 
-void http_connection::read_header(std::shared_ptr<http_request> req)
+void http_connection::read_header()
 {
+    auto req = current_request();
+    if (!req)
+        return;
     enum message_read_status res = req->parse_headers(input);
+
     if (res == DATA_CORRUPTED)
     {
         /* Error while reading, terminate */
@@ -148,7 +168,7 @@ void http_connection::read_header(std::shared_ptr<http_request> req)
     }
     else if (res == MORE_DATA_EXPECTED)
     {
-        add_read_event();
+        add_read_and_timer();
         return;
     }
 
@@ -157,7 +177,7 @@ void http_connection::read_header(std::shared_ptr<http_request> req)
     switch (req->kind)
     {
     case REQUEST:
-        get_body(req);
+        get_body();
         break;
     case RESPONSE:
         if (req->response_code == HTTP_NOCONTENT || req->response_code == HTTP_NOTMODIFIED ||
@@ -167,7 +187,7 @@ void http_connection::read_header(std::shared_ptr<http_request> req)
         }
         else
         {
-            get_body(req);
+            get_body();
         }
         break;
     default:
@@ -177,8 +197,11 @@ void http_connection::read_header(std::shared_ptr<http_request> req)
     }
 }
 
-void http_connection::get_body(std::shared_ptr<http_request> req)
+void http_connection::get_body()
 {
+    auto req = current_request();
+    if (!req)
+        return;
     /* If this is a request without a body, then we are done */
     if (req->kind == REQUEST && req->type != REQ_POST)
     {
@@ -200,11 +223,14 @@ void http_connection::get_body(std::shared_ptr<http_request> req)
             return;
         }
     }
-    read_body(req);
+    read_body();
 }
 
-void http_connection::read_body(std::shared_ptr<http_request> req)
+void http_connection::read_body()
 {
+    auto req = current_request();
+    if (!req)
+        return;
     if (req->chunked > 0)
     {
         switch (req->handle_chunked_read(input))
@@ -212,7 +238,7 @@ void http_connection::read_body(std::shared_ptr<http_request> req)
         case ALL_DATA_READ:
             /* finished last chunk */
             state = READING_TRAILER;
-            read_trailer(req);
+            read_trailer();
             return;
         case DATA_CORRUPTED:
             fail(HTTP_INVALID_HEADER);
@@ -239,12 +265,14 @@ void http_connection::read_body(std::shared_ptr<http_request> req)
     }
 
     /* Read more! */
-    // this->add_read();
-    add_read_event();
+    add_read_and_timer();
 }
 
-void http_connection::read_trailer(std::shared_ptr<http_request> req)
+void http_connection::read_trailer()
 {
+    auto req = current_request();
+    if (!req)
+        return;
     switch (req->parse_headers(input))
     {
     case DATA_CORRUPTED:
@@ -255,7 +283,7 @@ void http_connection::read_trailer(std::shared_ptr<http_request> req)
         break;
     case MORE_DATA_EXPECTED:
     default:
-        add_read_event();
+        add_read_and_timer();
         break;
     }
 }
@@ -268,23 +296,22 @@ void http_connection::read_trailer(std::shared_ptr<http_request> req)
 
 void http_connection::read_http()
 {
-    // std::cout << __func__ << " state = " << state << "\n";
     if (is_closed() || requests.empty())
         return;
-    auto req = requests.front();
+
     switch (state)
     {
     case READING_FIRSTLINE:
-        read_firstline(req);
+        read_firstline();
         break;
     case READING_HEADERS:
-        read_header(req);
+        read_header();
         break;
     case READING_BODY:
-        read_body(req);
+        read_body();
         break;
     case READING_TRAILER:
-        read_trailer(req);
+        read_trailer();
         break;
     case DISCONNECTED:
     case CONNECTING:
@@ -314,7 +341,7 @@ void http_connection::handler_write(http_connection *conn)
     conn->remove_write_timer();
     if (conn->get_obuf_length() > 0)
     {
-        conn->add_write_event();
+        conn->add_write_and_timer();
     }
     else
     {
@@ -325,6 +352,12 @@ void http_connection::handler_write(http_connection *conn)
 
 void http_connection::handler_error(http_connection *conn)
 {
+    if (errno == EPIPE || errno == ECONNRESET)
+    {
+        conn->close(1);
+        return;
+    }
+
     LOG_ERROR << "[HTTP] error read/write connection fd=" << conn->fd();
     conn->fail(HTTP_EOF);
 }
