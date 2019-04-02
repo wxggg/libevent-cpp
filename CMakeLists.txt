@@ -41,10 +41,10 @@ add_library(libeventcpp_s STATIC ${SOURCES})
 target_compile_features(libeventcpp PUBLIC cxx_std_14)
 target_compile_features(libeventcpp_s PUBLIC cxx_std_14)
 
-target_include_directories(libeventcpp PUBLIC ${INCLUDE_DIRECTORIES})
-target_include_directories(libeventcpp_s PUBLIC ${INCLUDE_DIRECTORIES})
+target_include_directories(libeventcpp PRIVATE ${INCLUDE_DIRECTORIES})
+target_include_directories(libeventcpp_s PRIVATE ${INCLUDE_DIRECTORIES})
 
-target_link_libraries(libeventcpp PUBLIC Threads::Threads)
-target_link_libraries(libeventcpp_s PUBLIC Threads::Threads)
+target_link_libraries(libeventcpp PRIVATE Threads::Threads)
+target_link_libraries(libeventcpp_s PRIVATE Threads::Threads)
 
 add_subdirectory(test)
