@@ -18,8 +18,8 @@ http_request::http_request()
 {
     this->kind = RESPONSE; // defualt is RESPONSE
 
-    input_buffer = std::make_unique<buffer>();
-    output_buffer = std::make_unique<buffer>();
+    input_buffer = std::unique_ptr<buffer>(new buffer);
+    output_buffer = std::unique_ptr<buffer>(new buffer);
 }
 
 http_request::http_request(http_connection *conn)
@@ -27,8 +27,8 @@ http_request::http_request(http_connection *conn)
 {
     this->kind = RESPONSE; // defualt is RESPONSE
 
-    input_buffer = std::make_unique<buffer>();
-    output_buffer = std::make_unique<buffer>();
+    input_buffer = std::unique_ptr<buffer>(new buffer);
+    output_buffer = std::unique_ptr<buffer>(new buffer);
 }
 
 http_request::~http_request()
@@ -58,7 +58,7 @@ void http_request::send_error(int error, std::string reason)
     err_page += "<p>Invalid method in request</p>\n";
     err_page += "</body></html>\n";
 
-    auto buf = std::make_unique<buffer>();
+    auto buf = std::unique_ptr<buffer>(new buffer);
     buf->push_back_string(err_page);
 
     this->input_headers["Connection"] = "close";
@@ -77,7 +77,7 @@ void http_request::send_not_found()
     not_found_page += "<p>The requested URL " + urihtml + " was not found on this server.</p>";
     not_found_page += "</body></html>\n";
 
-    auto buf = std::make_unique<buffer>();
+    auto buf = std::unique_ptr<buffer>(new buffer);
     buf->push_back_string(not_found_page);
 
     this->set_response(HTTP_NOTFOUND, "Not Found");

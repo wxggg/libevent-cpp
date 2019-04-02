@@ -20,10 +20,23 @@ event::event(std::shared_ptr<event_base> base)
 	id = _internal_event_id++;
 }
 
+void event::init(std::shared_ptr<event> const &e)
+{
+	(void)e;
+}
+
 void event::set_base(std::shared_ptr<event_base> base)
 {
 	this->base = base;
 	this->pri = base->active_queue_size() / 2;
+}
+
+std::shared_ptr<event_base> event::get_base()
+{
+	std::shared_ptr<event_base> b = base.lock();
+	if (!b)
+		LOG_ERROR << "error base is expired\n";
+	return b;
 }
 
 

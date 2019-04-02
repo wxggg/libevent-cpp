@@ -18,7 +18,7 @@ unsigned short port = 9102;
 void http_test_cb(http_request *req)
 {
     cerr << __func__ << " called\n";
-    auto buf = std::make_unique<buffer>();
+    auto buf = std::unique_ptr<buffer>(new buffer);
     buf->push_back_string("This is funny");
     const std::string &multi = req->input_headers["X-multi"];
     if (!multi.empty())
@@ -52,7 +52,7 @@ static void
 http_chunked_trickle_cb(std::shared_ptr<time_event> ev, struct chunk_req_state *state)
 {
     cerr << __func__ << " called!!\n";
-    auto buf = std::make_unique<buffer>();
+    auto buf = std::unique_ptr<buffer>(new buffer);
     buf->push_back_string(CHUNKS[state->i]);
     state->req->send_reply_chunk(std::move(buf));
 
@@ -97,7 +97,7 @@ void http_post_cb(http_request *req)
 
     cout << "get data::" << req->input_buffer->get_data() << endl;
 
-    auto buf = std::make_unique<buffer>();
+    auto buf = std::unique_ptr<buffer>(new buffer);
     buf->push_back_string("This is funny");
 
     req->send_reply(HTTP_OK, "Everything is find", std::move(buf));
@@ -122,7 +122,7 @@ void http_large_delay_cb(http_request *req)
 void http_dispatcher_cb(http_request *req)
 {
     cerr << __func__ << " called!!!\n";
-    auto buf = std::make_unique<buffer>();
+    auto buf = std::unique_ptr<buffer>(new buffer);
     buf->push_back_string("dispatcher-test");
 
     req->send_reply(HTTP_OK, "Everything is find", std::move(buf));
@@ -131,7 +131,7 @@ void http_dispatcher_cb(http_request *req)
 void http_keep_alive_cb(http_request *req)
 {
     cerr << __func__ << " called!!!\n";
-    auto buf = std::make_unique<buffer>();
+    auto buf = std::unique_ptr<buffer>(new buffer);
     cout << req->uri << endl;
     buf->push_back_string(req->uri);
 
@@ -141,7 +141,7 @@ void http_keep_alive_cb(http_request *req)
 static unique_ptr<http_server> http_setup()
 {
     cout << __func__ << endl;
-    auto server = make_unique<http_server>();
+    auto server = std::unique_ptr<http_server>(new http_server);
     server->resize_thread_pool(1);
     server->set_timeout(10);
 

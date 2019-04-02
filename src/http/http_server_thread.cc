@@ -42,7 +42,7 @@ std::unique_ptr<http_server_connection> http_server_thread::get_empty_connection
     if (emptyQueue.empty())
     {
         std::cout << "i=" << i++ << "\n";
-        return std::make_unique<http_server_connection>(base, -1, server);
+        return std::unique_ptr<http_server_connection>(new http_server_connection(base, -1, server));
     }
 
     auto conn = std::move(emptyQueue.front());

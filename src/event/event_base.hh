@@ -84,7 +84,7 @@ class event_base
 	void clean_rw_event(const std::shared_ptr<rw_event> &ev);
 
 	template <typename E, typename F, typename... Rest>
-	decltype(auto) register_callback(E &&e, F &&f, Rest &&... rest)
+	void register_callback(E &&e, F &&f, Rest &&... rest)
 	{
 		auto tsk = std::bind(std::forward<F>(f), std::forward<Rest>(rest)...);
 		callbackMap[e->id] = std::make_shared<Callback>([tsk]() { tsk(); });

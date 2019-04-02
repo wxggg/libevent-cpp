@@ -2,20 +2,37 @@
 #include <sstream>
 #include <regex>
 #include <iostream>
+#include <algorithm>
 
 namespace eve
 {
 
 bool iequals(const std::string &a, const std::string &b)
 {
-    return std::equal(a.begin(), a.end(), b.begin(), b.end(),
-                      [](char a, char b) { return tolower(a) == tolower(b); });
+    if (a.size() != b.size())
+        return false;
+
+    for (size_t i = 0; i < a.size(); i++) {
+        if (::tolower(a[i]) != ::tolower(b[i]))
+            return false;
+    }
+
+    return true;
 }
 
 bool iequals_n(const std::string &a, const std::string &b, int n)
 {
-    return std::equal(a.begin(), a.begin() + n, b.begin(), b.end(),
-                      [](char a, char b) { return tolower(a) == tolower(b); });
+    if (a.size() != b.size())
+        return false;
+
+    n = std::min(static_cast<int>(a.size()), n);
+
+    for (size_t i = 0; i < static_cast<size_t>(n); i++) {
+        if (::tolower(a[i]) != ::tolower(b[i]))
+            return false;
+    }
+
+    return true;
 }
 
 bool is_palindrome(const std::string &s)
@@ -67,7 +84,7 @@ std::string string_from_utf8(const std::string &in)
 {
     std::string result;
     std::stringstream ss;
-    int i = 0, n = in.length();
+    size_t i = 0, n = in.length();
     bool flag = false;
     while (i < n)
     {
@@ -75,7 +92,7 @@ std::string string_from_utf8(const std::string &in)
         if (x == '%')
         {
             flag = true;
-            ss << (char)((16 * hex_to_int(in[i++]) + hex_to_int(in[i++])));
+            ss << static_cast<char>((16 * hex_to_int(in[i++]) + hex_to_int(in[i++])));
         }
         else
         {

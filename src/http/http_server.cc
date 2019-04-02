@@ -12,7 +12,7 @@ namespace eve
 http_server::~http_server()
 {
     std::cout << __func__ << std::endl;
-    for (int i = 0; i < static_cast<int>(threads.size()); i++)
+    for (size_t i = 0; i < threads.size(); i++)
     {
         threads[i]->terminate();
         threads[i]->wakeup();
@@ -28,10 +28,11 @@ void http_server::resize_thread_pool(int nThreads)
 {
     pool->resize(nThreads);
     int currentThreads = threads.size();
+
     if (currentThreads <= nThreads)
     {
         for (int i = currentThreads; i < nThreads; i++)
-            threads.push_back(std::make_unique<http_server_thread>(this));
+            threads.push_back(std::unique_ptr<http_server_thread>(new http_server_thread(this)));
     }
     else
         threads.resize(nThreads);
@@ -49,7 +50,7 @@ static void __listen_cb(int fd, http_server *server)
     int nfd = accept_socket(fd, host, port);
     LOG << "[server] ===> new client in with fd=" << nfd << " hostname=" << host << " portname=" << port << "\n";
 
-    server->clientQueue.push(std::make_unique<http_client_info>(nfd, host, port));
+    server->clientQueue.push(std::unique_ptr<http_client_info>(new http_client_info(nfd, host, port)));
     server->wakeup_random(2);
 }
 /*

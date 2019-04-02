@@ -118,7 +118,7 @@ static void http_connection_test(int persistent)
     client->set_timeout(15);
 
     auto conn = client->make_connection(host, port);
-    auto req = make_unique<http_request>();
+    auto req = std::unique_ptr<http_request>(new http_request);
 
     req->output_headers["Host"] = "somehost";
     req->uri = "/test";
@@ -167,7 +167,7 @@ static void close_detect_launch()
 {
     cout << __func__ << endl;
 
-    auto req = make_unique<http_request>();
+    auto req = std::unique_ptr<http_request>(new http_request);
     req->output_headers["Host"] = "somehost";
     req->type = REQ_GET;
     req->uri = "/test";
@@ -203,7 +203,7 @@ static void http_close_detection(int with_delay)
 
     client->set_timeout(2);
 
-    auto req = make_unique<http_request>();
+    auto req = std::unique_ptr<http_request>(new http_request);
     req->output_headers["Host"] = "somehost";
     req->type = REQ_GET;
     req->set_cb(close_detect_cb);
@@ -248,7 +248,7 @@ static void http_post_test(void)
 
     auto client = make_shared<http_client>();
     auto conn = client->make_connection(host, port);
-    auto req = make_unique<http_request>();
+    auto req = std::unique_ptr<http_request>(new http_request);
     req->output_headers["Host"] = "somehost";
     req->output_buffer->push_back_string("Okay. not really printf");
     req->uri = "/postit";
@@ -322,7 +322,7 @@ static void http_dispatcher_test(void)
 
     auto client = make_shared<http_client>();
     auto conn = client->make_connection(host, port);
-    auto req = make_unique<http_request>();
+    auto req = std::unique_ptr<http_request>(new http_request);
     req->set_cb(http_dispatcher_test_done);
     req->output_headers["Host"] = "somehost";
     req->type = REQ_GET;
@@ -373,7 +373,7 @@ static void http_negative_content_length_test(void)
     cout << __func__ << endl;
     auto client = make_shared<http_client>();
     auto conn = client->make_connection(host, port);
-    auto req = make_unique<http_request>();
+    auto req = std::unique_ptr<http_request>(new http_request);
     req->set_cb(http_request_bad);
     req->output_headers["X-Negative"] = "makeitso";
     req->output_headers["Host"] = "somehost";
@@ -446,7 +446,7 @@ static void http_chunked_handle_test(void)
     cout << __func__ << endl;
     auto client = make_shared<http_client>();
     auto conn = client->make_connection(host, port);
-    auto req = make_unique<http_request>();
+    auto req = std::unique_ptr<http_request>(new http_request);
 
     req->set_cb(request_chunked_done);
     req->output_headers["Connection"] = "close";
@@ -473,7 +473,7 @@ static void http_keepalive_test(void)
 
     for (int i = 0; i < 20; i++)
     {
-        auto req = make_unique<http_request>();
+        auto req = std::unique_ptr<http_request>(new http_request);
 
         req->set_cb(keep_alive_cb);
         req->output_headers["Connection"] = "keep-alive";
@@ -484,7 +484,7 @@ static void http_keepalive_test(void)
         conn->make_request(std::move(req));
     }
 
-    auto req = make_unique<http_request>();
+    auto req = std::unique_ptr<http_request>(new http_request);
 
     req->set_cb(keep_alive_cb);
     req->output_headers["Connection"] = "close";

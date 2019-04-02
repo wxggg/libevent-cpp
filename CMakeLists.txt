@@ -38,8 +38,8 @@ set(INCLUDE_DIRECTORIES
 add_library(libeventcpp SHARED ${SOURCES})
 add_library(libeventcpp_s STATIC ${SOURCES})
 
-target_compile_features(libeventcpp PUBLIC cxx_std_14)
-target_compile_features(libeventcpp_s PUBLIC cxx_std_14)
+target_compile_features(libeventcpp PUBLIC cxx_std_11)
+target_compile_features(libeventcpp_s PUBLIC cxx_std_11)
 
 target_include_directories(libeventcpp PRIVATE ${INCLUDE_DIRECTORIES})
 target_include_directories(libeventcpp_s PRIVATE ${INCLUDE_DIRECTORIES})

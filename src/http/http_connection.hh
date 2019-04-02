@@ -123,11 +123,11 @@ class http_connection : public buffer_event
 		emptyQueue.push(std::move(req));
 	}
 
-	inline decltype(auto) get_empty_request()
+	inline std::unique_ptr<http_request> get_empty_request()
 	{
 		if (emptyQueue.empty())
 		{
-			return std::make_unique<http_request>(this);
+			return std::unique_ptr<http_request>(new http_request(this));
 		}
 		auto req = std::move(emptyQueue.front());
 		emptyQueue.pop();
