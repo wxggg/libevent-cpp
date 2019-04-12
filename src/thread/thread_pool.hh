@@ -52,7 +52,7 @@ class thread_pool
 	void stop(bool isWait);
 
 	template <typename F, typename... Rest>
-	decltype(auto) push(F &&f, Rest &&... rest)
+	std::future<typename std::result_of<F(Rest...)>::type> push(F &&f, Rest &&... rest)
 	{
 		auto tsk = std::make_shared<std::packaged_task<decltype(f(rest...))()>>(
 			std::bind(std::forward<F>(f), std::forward<Rest>(rest)...));

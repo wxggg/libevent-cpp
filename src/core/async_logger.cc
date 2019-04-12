@@ -11,7 +11,7 @@ async_logger::async_logger()
 {
     for (int i = 0; i < 2; i++)
     {
-        auto buf = std::make_unique<buffer>();
+        auto buf = std::unique_ptr<buffer>(new buffer);
         buf->resize(4 * 1024 * 1024);
         emptyQueue.push(std::move(buf));
     }
@@ -21,7 +21,7 @@ async_logger::async_logger()
     out.open(logFile);
 
     running = true;
-    logThread = std::make_unique<std::thread>([=] { gather(); });
+    logThread = std::unique_ptr<std::thread>(new std::thread([=] { gather(); }));
 }
 
 async_logger::~async_logger()

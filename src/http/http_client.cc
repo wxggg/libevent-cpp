@@ -14,7 +14,7 @@ std::unique_ptr<http_client_connection> http_client::make_connection(
 {
     int fd = get_nonblock_socket();
 
-    auto conn = std::make_unique<http_client_connection>(base, fd, shared_from_this());
+    auto conn = std::unique_ptr<http_client_connection>(new http_client_connection(base, fd, shared_from_this()));
     conn->servaddr = address;
     conn->servport = port;
 

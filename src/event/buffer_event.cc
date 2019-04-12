@@ -7,8 +7,8 @@ namespace eve
 buffer_event::buffer_event(std::shared_ptr<event_base> base, int fd)
     : base(base)
 {
-    input = std::make_unique<buffer>();
-    output = std::make_unique<buffer>();
+    input = std::unique_ptr<buffer>(new buffer);
+    output = std::unique_ptr<buffer>(new buffer);
     ev = std::make_shared<rw_event>(base, fd, NONE);
     base->register_callback(ev, rw_callback, this);
 }

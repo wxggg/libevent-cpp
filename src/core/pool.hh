@@ -50,7 +50,7 @@ class pool
     ~pool() {}
 
     template <typename... Args>
-    inline decltype(auto) allocate_unique(Args &&... args)
+    inline std::unique_ptr<T, Deleter> allocate_unique(Args &&... args)
     {
         auto p = allocate();
         new (p) T(std::forward<Args>(args)...);
@@ -65,7 +65,7 @@ class pool
         begin = reinterpret_cast<T *>(newBlock);
     }
 
-    inline decltype(auto) allocate()
+    inline T* allocate()
     {
         if (freeQueue.empty())
         {

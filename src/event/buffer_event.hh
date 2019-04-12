@@ -28,28 +28,28 @@ public:
   ~buffer_event();
 
   template <typename F, typename... Rest>
-  decltype(auto) register_readcb(F &&f, Rest &&... rest)
+  void register_readcb(F &&f, Rest &&... rest)
   {
     auto tsk = std::bind(std::forward<F>(f), std::forward<Rest>(rest)...);
     readcb = std::make_shared<Callback>([tsk]() { tsk(); });
   }
 
   template <typename F, typename... Rest>
-  decltype(auto) register_eofcb(F &&f, Rest &&... rest)
+  void register_eofcb(F &&f, Rest &&... rest)
   {
     auto tsk = std::bind(std::forward<F>(f), std::forward<Rest>(rest)...);
     eofcb = std::make_shared<Callback>([tsk]() { tsk(); });
   }
 
   template <typename F, typename... Rest>
-  decltype(auto) register_writecb(F &&f, Rest &&... rest)
+  void register_writecb(F &&f, Rest &&... rest)
   {
     auto tsk = std::bind(std::forward<F>(f), std::forward<Rest>(rest)...);
     writecb = std::make_shared<Callback>([tsk]() { tsk(); });
   }
 
   template <typename F, typename... Rest>
-  decltype(auto) register_errorcb(F &&f, Rest &&... rest)
+  void register_errorcb(F &&f, Rest &&... rest)
   {
     auto tsk = std::bind(std::forward<F>(f), std::forward<Rest>(rest)...);
     errorcb = std::make_shared<Callback>([tsk]() { tsk(); });
@@ -62,10 +62,10 @@ public:
   inline const char *get_ibuf_data() const { return input->get_data(); }
   inline const char *get_obuf_data() const { return output->get_data(); }
 
-  inline auto &get_ibuf() { return input; }
-  inline auto &get_obuf() { return output; }
+  inline std::unique_ptr<buffer> &get_ibuf() { return input; }
+  inline std::unique_ptr<buffer> &get_obuf() { return output; }
 
-  decltype(auto) get_base()
+  std::shared_ptr<event_base> get_base()
   {
     auto b = base.lock();
     if (!b)

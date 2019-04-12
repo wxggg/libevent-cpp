@@ -9,7 +9,7 @@ using namespace eve;
 
 void home(http_request * req)
 {
-    auto buf = std::make_unique<buffer>();
+    auto buf = std::unique_ptr<buffer>(new buffer);
     buf->push_back_string("This is funnyThis is funnyThis iunny");
 
     /* allow sending of an empty reply */
@@ -19,7 +19,7 @@ void home(http_request * req)
 int main(int argc, char const *argv[])
 {
     init_log_file("server.log");
-    auto server = make_unique<http_server>();
+    auto server = std::unique_ptr<http_server>(new http_server);
     server->set_timeout(15);
 
     server->set_handle_cb("/", home);

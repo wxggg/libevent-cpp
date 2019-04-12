@@ -49,17 +49,11 @@ class event
 	event(std::shared_ptr<event_base> base);
 	virtual ~event() {}
 
-	virtual void init(std::shared_ptr<event>) {}
+	virtual void init(std::shared_ptr<event> const &e);
 
 	void set_base(std::shared_ptr<event_base> base);
 
-	decltype(auto) get_base()
-	{
-		auto b = base.lock();
-		if (!b)
-			LOG_ERROR << "error base is expired\n";
-		return b;
-	}
+	std::shared_ptr<event_base> get_base();
 
 	inline void set_active() { _active = true; }
 	inline void clear_active() { _active = false; }
@@ -73,7 +67,7 @@ class event
 };
 
 template <typename T, typename... Rest>
-decltype(auto) create_event(Rest &&... rest)
+std::shared_ptr<T> create_event(Rest &&... rest)
 {
 	auto ev = std::make_shared<T>(std::forward<Rest>(rest)...);
 	ev->init(ev);
