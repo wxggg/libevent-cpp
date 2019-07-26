@@ -4,8 +4,8 @@
 
 [![Build Status](https://api.travis-ci.com/wxggg/libevent-cpp.svg)](https://travis-ci.com/wxggg/libevent-cpp)
 
-## Warning:  目前还存在bug可能会导致崩溃，主要是当进行长时间的高并发压力测试的时候会产生指针访问异常，导致程序崩溃，经过重构后的项目为 https://github.com/wxggg/libio， 清晰而且基本没有bug和内存泄漏
-## Warning: There are still bugs that may cause a crash. The main reason is that when a long-term high-concurrency stress test is performed, a pointer access exception will occur, causing the program to crash. The refactored project is https://github.com/wxggg/libio , clear and basically no bugs and memory leaks
+## Warning:  目前还存在bug可能会导致崩溃，主要是当进行长时间的高并发压力测试的时候会产生指针访问异常，导致程序崩溃，经过重构后的项目为 [https://github.com/wxggg/libio](https://github.com/wxggg/libio)， 清晰而且基本没有bug和内存泄漏
+## Warning: There are still bugs that may cause a crash. The main reason is that when a long-term high-concurrency stress test is performed, a pointer access exception will occur, causing the program to crash. The refactored project is [https://github.com/wxggg/libio](https://github.com/wxggg/libio) , clear and basically no bugs and memory leaks
 
 # Features
 * 使用IO多路复用技术，支持select、poll及epoll
