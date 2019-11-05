@@ -1,11 +1,11 @@
+# 这个项目不再更新， 如有兴趣或问题，请移步 [https://github.com/wxggg/libio](https://github.com/wxggg/libio)
+
 ![](res/libevent-cpp.png)
 
 **Libevent-cpp 是使用C++重构libevent的高性能多线程网络库，在重写libevent的基础上增加了对多线程的支持，能很方便的实现一个高并发的http服务器**
 
 [![Build Status](https://api.travis-ci.com/wxggg/libevent-cpp.svg)](https://travis-ci.com/wxggg/libevent-cpp)
 
-## More 
-[https://github.com/wxggg/libio](https://github.com/wxggg/libio)
 
 # Features
 * 使用IO多路复用技术，支持select、poll及epoll
@@ -16,9 +16,6 @@
 * 仅支持Linux
 * 使用连接池来复用连接以提高效率
 * 增加异步日志系统，利用空闲缓冲池队列来进行异步日志系统性能优化
-
-**WARNING: There's bugs in this project**
-> When benched with webbench.c for high concurrency for more than 60 seconds, the code may corupt.
 
 # Documentations
 * [libevent-cpp 基本架构及信号机制](docs/1-libevent-cpp-0.0.1-signal.md)
@@ -37,87 +34,6 @@ make -j4
 
 # Usage
 使用libevent-cpp能够非常方便的创建一个http服务器，比如如下例子创建一个简单的静态http文件服务器
-```c++
-#include <http_server.hh>
-
-#include <memory>
-#include <iostream>
-#include <fstream>
-#include <algorithm>
-#include <string>
-#include <map>
-
-using namespace std;
-using namespace eve;
-
-void send_file(http_request *req, string path)
-{
-    if (path.at(path.length() - 1) == '/')
-        path += "index.html";
-    map<string, string> m;
-    m["html"] = "text/html";
-    m["css"] = "text/css";
-    m["xml"] = "text/xml";
-    m["png"] = "png";
-    m["js"] = "application/javascript";
-    path = "static/" + path;
-    auto pos = path.find_last_of('.');
-    if (pos == string::npos)
-    {
-        req->send_not_found();
-        return;
-    }
-    auto filename = path.substr(0, pos);
-    auto filetype = path.substr(pos + 1);
-    string type = "text/html";
-    if (m.count(filetype))
-        type = m[filetype];
-    req->output_headers["Content-Type"] = type + "; charset=utf-8";
-    req->output_headers["Accept-Ranges"] = "bytes";
-
-    if (filetype == "js")
-        req->output_headers["Content-Type"] = type;
-
-    cout << "visit file path=" << path << endl;
-
-    stringstream bufferstr;
-    {
-        ifstream ifs(path);
-        if (!ifs)
-        {
-            req->send_not_found();
-            return;
-        }
-        bufferstr << ifs.rdbuf();
-    }
-
-    auto buf = std::make_unique<buffer>();
-    buf->push_back_string(bufferstr.str());
-    req->send_reply(HTTP_OK, "Everything is fine", req->input_headers["Empty"].empty() ? std::move(buf) : nullptr);
-}
-
-void home(http_request *req)
-{
-    send_file(req, "index.html");
-}
-void general_cb(http_request *req)
-{
-    string path = req->uri.substr(1);
-    send_file(req, path);
-}
-
-int main(int argc, char const *argv[])
-{
-    auto server = make_shared<http_server>();
-
-    server->set_handle_cb("/", home);
-    server->set_gen_cb(general_cb);
-    server->resize_thread_pool(4);
-    server->start("localhost", 8080);
-
-    return 0;
-}
-```
 
 # Changelog
 
